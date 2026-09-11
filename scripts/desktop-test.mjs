@@ -105,7 +105,11 @@ try {
     .first()
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("金额（元）", { exact: false }).fill("35.50");
+  await dialog.getByLabel("金额（元）", { exact: false }).fill("20+15.50");
+  await dialog
+    .locator(".money-expression-result")
+    .filter({ hasText: "35.50" })
+    .waitFor();
   await dialog.getByLabel("备注").fill("桌面自动化测试");
   await dialog.getByRole("button", { name: "保存", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
@@ -117,9 +121,10 @@ try {
   for (const [name, file] of [
     ["交易记录", "03-transactions"],
     ["预算与周期", "04-budget"],
-    ["我的账户", "05-accounts"],
-    ["统计分析", "06-analysis"],
-    ["设置与数据", "07-settings"],
+    ["工资分配", "05-allocation"],
+    ["我的账户", "06-accounts"],
+    ["统计分析", "07-analysis"],
+    ["设置与数据", "08-settings"],
   ]) {
     await page
       .locator("nav")
@@ -128,6 +133,48 @@ try {
     await page.waitForTimeout(150);
     if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
       await page.screenshot({ path: path.join(result, file + ".png") });
+    if (name === "预算与周期") {
+      await page
+        .getByRole("button", { name: "个人默认预算", exact: true })
+        .click();
+      const budgetDialog = page.getByRole("dialog");
+      const addBudgetCategory = budgetDialog.getByRole("button", {
+        name: "添加",
+        exact: true,
+      });
+      assert(await addBudgetCategory.isDisabled());
+      const disabledHint = addBudgetCategory.locator("..");
+      await disabledHint.hover();
+      const tooltipBubble = page.locator(".tooltip-portal");
+      await tooltipBubble.waitFor();
+      assert.match(
+        (await tooltipBubble.textContent()) || "",
+        /已全部加入预算.*设置与数据/s,
+      );
+      const tooltipState = await disabledHint.evaluate((element) => ({
+        expanded: element.getAttribute("aria-expanded"),
+      }));
+      assert.equal(tooltipState.expanded, "true", JSON.stringify(tooltipState));
+      const tooltipBox = await tooltipBubble.boundingBox();
+      const viewport = await page.evaluate(() => ({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }));
+      assert(tooltipBox && viewport, "说明气泡没有可测量的边界");
+      assert(tooltipBox.x >= 0 && tooltipBox.y >= 0, "说明气泡超出左侧或顶部");
+      assert(
+        tooltipBox.x + tooltipBox.width <= viewport.width &&
+          tooltipBox.y + tooltipBox.height <= viewport.height,
+        "说明气泡超出窗口右侧或底部",
+      );
+      if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
+        await page.screenshot({
+          path: path.join(result, "10-budget-category-hint.png"),
+        });
+      await budgetDialog
+        .getByRole("button", { name: "关闭", exact: true })
+        .click();
+    }
   }
   await page.getByRole("button", { name: "固定账单", exact: true }).click();
   await page.getByRole("button", { name: "新增账单" }).click();
@@ -143,6 +190,30 @@ try {
     .locator("nav")
     .getByRole("button", { name: "总览", exact: true })
     .click();
+  const safeSpendTip = page.locator(
+    '.help-tip[aria-label="取本周期剩余预算与主要消费账户可用余额中较小的非负值"]',
+  );
+  await safeSpendTip.hover();
+  const safeSpendBubble = page.locator(".tooltip-portal");
+  await safeSpendBubble.waitFor();
+  const safeSpendBox = await safeSpendBubble.boundingBox();
+  const safeViewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  assert(safeSpendBox && safeViewport, "当前可安心支出说明没有可测量的边界");
+  assert(
+    safeSpendBox.x >= 0 &&
+      safeSpendBox.y >= 0 &&
+      safeSpendBox.x + safeSpendBox.width <= safeViewport.width &&
+      safeSpendBox.y + safeSpendBox.height <= safeViewport.height,
+    "当前可安心支出说明被窗口裁剪",
+  );
+  if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
+    await page.screenshot({
+      path: path.join(result, "11-safe-spend-tooltip.png"),
+    });
+  await page.mouse.move(0, 0);
   if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
     await page.screenshot({ path: path.join(result, "08-overview-dark.png") });
   await app.evaluate(({ BrowserWindow }) => {
@@ -165,11 +236,13 @@ try {
         checks: [
           "首次设置",
           "真实SQLite账本",
-          "通过中文表单新增支出",
-          "六个主页面",
+          "通过中文表单用金额算式新增支出",
+          "七个主页面（含独立工资分配）",
           "固定账单弹层",
           "浅深主题",
           "1100px布局",
+          "禁用控件原因悬停说明",
+          "说明气泡自动避开卡片和窗口边界",
         ],
         dataDir: env.SALARYFLOW_DATA_DIR,
       },

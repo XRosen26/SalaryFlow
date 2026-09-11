@@ -8,6 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Store } from "../core/store.mjs";
 import { schema } from "../core/schema.mjs";
 import { currentSchema } from "../core/migrations.mjs";
+import { resetLedgerFiles } from "../core/storage.mjs";
 import { parseCSV, previewCSV, exportCSV } from "../core/csv.mjs";
 function setup(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "salaryflow-check-"));
@@ -361,4 +362,51 @@ test("随机交易序列余额守恒，转账不改变净结余", (t) => {
   const snap = s.snapshot();
   assert.equal(BigInt(snap.totalAssets), 1070000n + net);
   assert.equal(BigInt(snap.report.saving), net);
+});
+
+test("工资日可立即生效或在7天后开始新规则", (t) => {
+  const immediate = setup(t).s;
+  const before = immediate.snapshot().cycle;
+  immediate.command("setPayday", { payday: 25, mode: "IMMEDIATE" });
+  const now = immediate.snapshot().cycle;
+  assert.equal(now.id, before.id);
+  assert.equal(now.end, "2026-09-25");
+  assert.equal(
+    immediate.one(
+      "SELECT payday FROM cycle_rules WHERE effective_from='2026-09-20'",
+    ).payday,
+    25,
+  );
+  assert.equal(immediate.ensureCycle("2026-09-25").start, "2026-09-25");
+
+  const nextWeek = setup(t).s;
+  nextWeek.command("setPayday", { payday: 15, mode: "NEXT_WEEK" });
+  assert.equal(nextWeek.snapshot().cycle.end, "2026-09-27");
+  const following = nextWeek.ensureCycle("2026-09-27");
+  assert.equal(following.start, "2026-09-27");
+  assert.equal(following.end, "2026-10-15");
+});
+
+test("清空账本文件可选择删除应用备份且保留其他文件", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "salaryflow-reset-"));
+  const backups = path.join(dir, "backups");
+  fs.mkdirSync(backups);
+  for (const file of [
+    path.join(dir, "ledger.sqlite"),
+    path.join(dir, "ledger.sqlite-wal"),
+    path.join(dir, "backup-status.json"),
+    path.join(backups, "SalaryFlow-test-manual-a.sqlite"),
+    path.join(backups, "SalaryFlow-test-manual-a.sqlite.json"),
+    path.join(backups, "notes.txt"),
+  ])
+    fs.writeFileSync(file, "test");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const result = resetLedgerFiles(dir, backups, true);
+  assert.equal(result.removed, 5);
+  assert.equal(fs.existsSync(path.join(dir, "ledger.sqlite")), false);
+  assert.equal(
+    fs.existsSync(path.join(backups, "SalaryFlow-test-manual-a.sqlite")),
+    false,
+  );
+  assert.equal(fs.existsSync(path.join(backups, "notes.txt")), true);
 });

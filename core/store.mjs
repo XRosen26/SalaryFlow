@@ -5,7 +5,14 @@ import path from "node:path";
 import { schema } from "./schema.mjs";
 import { migrations, currentSchema } from "./migrations.mjs";
 import { minor, rate, budgetState, decimal, MAX_MONEY } from "./money.mjs";
-import { today, date, addDays, cycleRange, monthDay } from "./dates.mjs";
+import {
+  today,
+  date,
+  addDays,
+  cycleRange,
+  budgetPeriodRange,
+  monthDay,
+} from "./dates.mjs";
 import { seedBudget } from "./seed.mjs";
 
 const id = () => randomUUID();
@@ -182,6 +189,7 @@ export class Store {
     const allowed = [
       "initialize",
       "saveAccount",
+      "saveValuation",
       "archiveAccount",
       "setDefaults",
       "saveCategory",
@@ -204,7 +212,9 @@ export class Store {
       "processBill",
       "saveAllocation",
       "confirmAllocation",
+      "confirmAllocationPlan",
       "cancelAllocation",
+      "deleteAllocation",
       "commitImport",
       "revertImport",
       "maintenance",
@@ -338,8 +348,10 @@ export class Store {
         p.accounts.length <= 100,
       "请至少创建一个账户",
     );
-    const payday = Number(p.payday);
-    cycleRange(this.clock(), payday);
+    const basis = p.basis ?? "SALARY";
+    ensure(["SALARY", "CALENDAR_MONTH"].includes(basis), "预算周期口径无效");
+    const payday = basis === "SALARY" ? Number(p.payday) : 1;
+    budgetPeriodRange(this.clock(), basis, payday);
     for (const name of ["银行卡", "第三方支付", "现金", "其他"])
       this.run("INSERT INTO account_types(id,name) VALUES(?,?)", id(), name);
     const typeId = this.one("SELECT id FROM account_types LIMIT 1").id;
@@ -368,12 +380,14 @@ export class Store {
       initialized: true,
       payday,
       started: date(p.start_date || this.clock()),
+      cycle_basis: basis,
     });
     this.run(
-      "INSERT INTO cycle_rules VALUES(?,?,?)",
+      "INSERT INTO cycle_rules(id,effective_from,payday,basis) VALUES(?,?,?,?)",
       id(),
       "1900-01-01",
       payday,
+      basis,
     );
     const defaults = {};
     for (const a of p.accounts) {
@@ -426,6 +440,26 @@ export class Store {
       roles.every((r) => ["SALARY", "SPENDING", "SAVINGS"].includes(r)),
       "账户角色无效",
     );
+    const valuationMode =
+      p.valuation_mode === undefined
+        ? old?.valuation_mode ?? 0
+        : p.valuation_mode
+          ? 1
+          : 0;
+    ensure(
+      !valuationMode || !roles.some((r) => ["SALARY", "SPENDING"].includes(r)),
+      "理财估值账户不能设为工资或消费账户",
+    );
+    ensure(
+      !old ||
+        valuationMode ||
+        !old.valuation_mode ||
+        !this.one(
+          "SELECT id FROM account_valuations WHERE account_id=? LIMIT 1",
+          old.id,
+        ),
+      "已有估值历史的账户不能关闭估值模式，可归档后新建普通账户",
+    );
     const a = {
       id: old?.id ?? id(),
       name: label(p.name),
@@ -433,29 +467,32 @@ export class Store {
       start_date: old?.start_date ?? date(p.start_date || this.clock()),
       roles: json(roles),
       hidden: p.hidden ? 1 : 0,
+      valuation_mode: valuationMode,
       archived: old?.archived ?? 0,
       note: safeNote(p.note),
     };
     ensure(a.start_date <= this.clock(), "记账起点不能晚于今天");
     if (old)
       this.run(
-        "UPDATE accounts SET name=?,type_id=?,roles=?,hidden=?,note=?,revision=revision+1 WHERE id=?",
+        "UPDATE accounts SET name=?,type_id=?,roles=?,hidden=?,valuation_mode=?,note=?,revision=revision+1 WHERE id=?",
         a.name,
         a.type_id,
         a.roles,
         a.hidden,
+        a.valuation_mode,
         a.note,
         a.id,
       );
     else {
       this.run(
-        "INSERT INTO accounts(id,name,type_id,start_date,roles,hidden,note,created_at) VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO accounts(id,name,type_id,start_date,roles,hidden,valuation_mode,note,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
         a.id,
         a.name,
         a.type_id,
         a.start_date,
         a.roles,
         a.hidden,
+        a.valuation_mode,
         a.note,
         now(),
       );
@@ -483,6 +520,45 @@ export class Store {
       "账户设置",
     );
     return { id: a.id };
+  }
+  saveValuation(p) {
+    const account = this.account(p.account_id);
+    ensure(account.valuation_mode, "只有理财估值账户可以更新估值");
+    const valuationDate = date(p.date || this.clock());
+    ensure(valuationDate <= this.clock(), "估值日期不能晚于今天");
+    const value = minor(p.value_minor, { zero: true });
+    const old = this.one(
+      "SELECT * FROM account_valuations WHERE account_id=? AND date=?",
+      account.id,
+      valuationDate,
+    );
+    if (old)
+      this.run(
+        "UPDATE account_valuations SET value_minor=?,note=?,operation_id=?,created_at=?,revision=revision+1 WHERE id=?",
+        value,
+        safeNote(p.note),
+        this.operation,
+        now(),
+        old.id,
+      );
+    else
+      this.run(
+        "INSERT INTO account_valuations(id,account_id,date,value_minor,note,operation_id,created_at) VALUES(?,?,?,?,?,?,?)",
+        id(),
+        account.id,
+        valuationDate,
+        value,
+        safeNote(p.note),
+        this.operation,
+        now(),
+      );
+    const saved = this.one(
+      "SELECT * FROM account_valuations WHERE account_id=? AND date=?",
+      account.id,
+      valuationDate,
+    );
+    this.audit("account_valuation", saved.id, old, saved, "更新理财账户估值");
+    return { id: saved.id };
   }
   archiveAccount(p) {
     const a = this.account(p.id, true);
@@ -512,8 +588,12 @@ export class Store {
           "SELECT id FROM transactions WHERE (source_id=? OR destination_id=?) AND (kind!='OPENING' OR amount_minor!=0)",
           a.id,
           a.id,
-        ),
-        "有历史交易的账户请使用归档",
+        ) &&
+          !this.one(
+            "SELECT id FROM account_valuations WHERE account_id=? LIMIT 1",
+            a.id,
+          ),
+        "有交易或估值历史的账户请使用归档",
       );
       this.run(
         "UPDATE accounts SET deleted=1,revision=revision+1 WHERE id=?",
@@ -634,7 +714,11 @@ export class Store {
       s,
     );
     ensure(rule, "请先完成账本设置");
-    let { start, end } = cycleRange(s, rule.payday);
+    let { start, end } = budgetPeriodRange(
+      s,
+      rule.basis ?? "SALARY",
+      rule.payday,
+    );
     if (start < rule.effective_from) start = rule.effective_from;
     const next = this.one(
       "SELECT effective_from FROM cycle_rules WHERE effective_from>? ORDER BY effective_from LIMIT 1",
@@ -1055,29 +1139,81 @@ export class Store {
   }
   balances(until = null) {
     const result = {};
-    try {
-      const q = this.db.prepare(
-        "SELECT account_id,SUM(delta) delta FROM movements" +
-          (until ? " WHERE date<?" : "") +
-          " GROUP BY account_id",
+    const addMovements = (accountId = null, after = null) => {
+      const clauses = [],
+        params = [];
+      if (accountId) {
+        clauses.push("account_id=?");
+        params.push(accountId);
+      }
+      if (after) {
+        clauses.push("date>?");
+        params.push(after);
+      }
+      if (until) {
+        clauses.push("date<?");
+        params.push(until);
+      }
+      const where = clauses.length ? " WHERE " + clauses.join(" AND ") : "";
+      try {
+        const q = this.db.prepare(
+          "SELECT account_id,SUM(delta) delta FROM movements" +
+            where +
+            " GROUP BY account_id",
+        );
+        q.setReadBigInts(true);
+        for (const row of q.all(...params))
+          result[row.account_id] = (result[row.account_id] ?? 0n) + row.delta;
+      } catch (e) {
+        if (!e.message.includes("integer overflow")) throw e;
+        for (const row of this.db
+          .prepare("SELECT account_id,delta FROM movements" + where)
+          .iterate(...params))
+          result[row.account_id] =
+            (result[row.account_id] ?? 0n) + BigInt(row.delta);
+      }
+    };
+    addMovements();
+    const supportsValuation = this.all("PRAGMA table_info(accounts)").some(
+      (column) => column.name === "valuation_mode",
+    );
+    if (!supportsValuation) return result;
+    for (const account of this.all(
+      "SELECT id FROM accounts WHERE deleted=0 AND valuation_mode=1",
+    )) {
+      const valuation = this.one(
+        "SELECT * FROM account_valuations WHERE account_id=?" +
+          (until ? " AND date<?" : "") +
+          " ORDER BY date DESC LIMIT 1",
+        ...(until ? [account.id, until] : [account.id]),
       );
-      q.setReadBigInts(true);
-      for (const r of until ? q.all(until) : q.all())
-        result[r.account_id] = r.delta;
-      return result;
-    } catch (e) {
-      if (!e.message.includes("integer overflow")) throw e;
-      const q = this.db.prepare(
-        "SELECT account_id,delta FROM movements" +
-          (until ? " WHERE date<?" : ""),
-      );
-      for (const r of until ? q.iterate(until) : q.iterate())
-        result[r.account_id] = (result[r.account_id] ?? 0n) + BigInt(r.delta);
-      return result;
+      if (!valuation) continue;
+      let movement = 0n;
+      const params = [
+        valuation.operation_id,
+        account.id,
+        account.id,
+        valuation.date,
+        valuation.date,
+      ];
+      let sql =
+        "SELECT t.source_id,t.destination_id,t.amount_minor FROM transactions t JOIN operations txop ON txop.id=t.operation_id JOIN operations valop ON valop.id=? WHERE t.deleted=0 AND (t.source_id=? OR t.destination_id=?) AND (t.date>? OR (t.date=? AND txop.rowid>valop.rowid))";
+      if (until) {
+        sql += " AND date<?";
+        params.push(until);
+      }
+      for (const row of this.all(sql, ...params)) {
+        if (row.destination_id === account.id)
+          movement += BigInt(row.amount_minor);
+        if (row.source_id === account.id)
+          movement -= BigInt(row.amount_minor);
+      }
+      result[account.id] = BigInt(valuation.value_minor) + movement;
     }
-  }
-  calibrate(p) {
+    return result;
+  }  calibrate(p) {
     const a = this.account(p.account_id);
+    ensure(!a.valuation_mode, "理财估值账户请使用更新估值");
     const actual = minor(p.actual_minor, { signed: true, zero: true });
     const delta = actual - (this.balances()[a.id] ?? 0n);
     ensure(delta !== 0n, "账面余额与实际一致，无需校准");
@@ -1182,40 +1318,107 @@ export class Store {
     );
   }
   setPayday(p) {
-    const payday = Number(p.payday);
-    cycleRange(this.clock(), payday);
+    const basis = p.basis ?? "SALARY";
+    ensure(["SALARY", "CALENDAR_MONTH"].includes(basis), "预算周期口径无效");
+    const payday = basis === "SALARY" ? Number(p.payday) : 1;
+    budgetPeriodRange(this.clock(), basis, payday);
+    const mode = p.mode ?? "NEXT_CYCLE";
+    ensure(
+      ["IMMEDIATE", "NEXT_CYCLE", "CUSTOM", "NEXT_WEEK"].includes(mode),
+      "周期规则生效方式无效",
+    );
     const current = this.ensureCycle(this.clock());
     ensure(
       !this.one("SELECT id FROM cycles WHERE start>=?", current.end),
-      "已经创建未来周期，请待下周期再调整工资日",
+      "已经创建未来周期，请待下周期再调整周期规则",
     );
+    const effective =
+      mode === "IMMEDIATE"
+        ? this.clock()
+        : mode === "CUSTOM"
+          ? date(p.effective_from)
+          : mode === "NEXT_WEEK"
+            ? addDays(this.clock(), 7)
+            : current.end;
+    if (mode === "CUSTOM")
+      ensure(effective > this.clock(), "指定生效日期必须晚于今天");
+    const proposedEnd =
+      mode === "IMMEDIATE"
+        ? budgetPeriodRange(this.clock(), basis, payday).end
+        : ["CUSTOM", "NEXT_WEEK"].includes(mode) && effective < current.end
+          ? effective
+          : current.end;
+    ensure(current.start < proposedEnd, "预算周期结束日期无效");
+    const changesCurrent = proposedEnd !== current.end;
+    if (changesCurrent)
+      ensure(
+        !this.one("SELECT id FROM settlements WHERE cycle_id=?", current.id),
+        "已有结算快照的周期不能重划边界，请选择下周期或更晚日期",
+      );
+    ensure(
+      !this.one(
+        "SELECT id FROM transactions WHERE cycle_id=? AND deleted=0 AND date>=?",
+        current.id,
+        proposedEnd,
+      ),
+      "调整会排除已有交易，请改为下周期或更晚日期生效",
+    );
+    const before = current;
+    this.run("DELETE FROM cycle_rules WHERE effective_from>?", this.clock());
+    if (changesCurrent)
+      this.run(
+        "UPDATE cycles SET end=?,revision=revision+1 WHERE id=?",
+        proposedEnd,
+        current.id,
+      );
     const pending = this.one(
       "SELECT * FROM cycle_rules WHERE effective_from=?",
-      current.end,
+      effective,
     );
     if (pending)
       this.run(
-        "UPDATE cycle_rules SET payday=? WHERE id=?",
+        "UPDATE cycle_rules SET payday=?,basis=? WHERE id=?",
         payday,
+        basis,
         pending.id,
       );
     else
       this.run(
-        "INSERT INTO cycle_rules VALUES(?,?,?)",
+        "INSERT INTO cycle_rules(id,effective_from,payday,basis) VALUES(?,?,?,?)",
         id(),
-        current.end,
+        effective,
         payday,
+        basis,
       );
+    this.setSettings({ payday, cycle_basis: basis });
+    const reason =
+      mode === "IMMEDIATE"
+        ? "预算周期规则立即生效"
+        : mode === "CUSTOM"
+          ? "预算周期规则指定日期生效"
+          : "预算周期规则下周期生效";
+    this.audit(
+      "cycle",
+      current.id,
+      before,
+      this.one("SELECT * FROM cycles WHERE id=?", current.id),
+      reason,
+    );
     this.audit(
       "cycle_rule",
-      current.end,
+      effective,
       null,
-      { payday, effective_from: current.end },
-      "下周期起生效",
+      { basis, payday, effective_from: effective },
+      reason,
     );
-    return { effective_from: current.end };
-  }
-  adjustCycle(p) {
+    return {
+      effective_from: effective,
+      cycle_end: proposedEnd,
+      basis,
+      payday,
+      mode,
+    };
+  }  adjustCycle(p) {
     const c = this.one("SELECT * FROM cycles WHERE id=?", p.id);
     ensure(c && c.status !== "CLOSED", "请先重新打开周期");
     ensure(
@@ -1284,11 +1487,51 @@ export class Store {
       ["zh-CN", "en"].includes(p.locale ?? old.locale ?? "zh-CN"),
       "语言选项无效",
     );
+    const requestedVisibility = p.amount_visibility ?? old.amount_visibility;
+    const amountVisibility = {
+      master:
+        typeof requestedVisibility?.master === "boolean"
+          ? requestedVisibility.master
+          : p.hide_amounts === undefined
+            ? !old.hide_amounts
+            : !p.hide_amounts,
+      overview: {
+        ...(old.amount_visibility?.overview ?? {}),
+        ...(requestedVisibility?.overview ?? {}),
+      },
+      accounts: {
+        ...(old.amount_visibility?.accounts ?? {}),
+        ...(requestedVisibility?.accounts ?? {}),
+      },
+      account_summary:
+        typeof requestedVisibility?.account_summary === "boolean"
+          ? requestedVisibility.account_summary
+          : old.amount_visibility?.account_summary !== false,
+    };
+    ensure(
+      Object.keys(amountVisibility.overview).every(
+        (key) =>
+          ["budget", "income", "assets"].includes(key) &&
+          typeof amountVisibility.overview[key] === "boolean",
+      ),
+      "总览金额显示设置无效",
+    );
+    ensure(
+      typeof amountVisibility.account_summary === "boolean",
+      "账户总资产显示设置无效",
+    );
+    ensure(
+      Object.keys(amountVisibility.accounts).length <= 500 &&
+        Object.entries(amountVisibility.accounts).every(
+          ([key, value]) => key.length <= 100 && typeof value === "boolean",
+        ),
+      "账户金额显示设置无效",
+    );
     const value = {
       theme: p.theme ?? old.theme,
       palette: p.palette ?? old.palette ?? "forest",
-      hide_amounts:
-        p.hide_amounts === undefined ? !!old.hide_amounts : !!p.hide_amounts,
+      hide_amounts: !amountVisibility.master,
+      amount_visibility: amountVisibility,
       locale: p.locale ?? old.locale ?? "zh-CN",
       allow_negative:
         p.allow_negative === undefined
@@ -1348,9 +1591,10 @@ export class Store {
       ))
         allocated += BigInt(r.amount_minor);
       ensure(
-        !salary.deleted && allocated <= BigInt(salary.amount_minor),
-        "分配金额不能超过有效工资金额",
+        !salary.deleted && salary.kind === "INCOME" && salary.salary,
+        "分配计划必须关联有效工资收入",
       );
+      ensure(allocated >= 0n && allocated <= MAX_MONEY, "分配金额超出支持范围");
     }
   }
   report(start, end, accountId = null) {
@@ -1514,6 +1758,12 @@ export class Store {
         ...a,
         roles: JSON.parse(a.roles),
         balance: String(balances[a.id] ?? 0n),
+        last_valuation: a.valuation_mode
+          ? this.one(
+              "SELECT * FROM account_valuations WHERE account_id=? ORDER BY date DESC LIMIT 1",
+              a.id,
+            )
+          : null,
       }))
       .sort((a, b) => {
         const order = settings.account_order ?? [];
@@ -1568,6 +1818,17 @@ export class Store {
       });
     }
     const totalBudget = budgetRows.reduce((n, x) => n + BigInt(x.budget), 0n);
+    const remainingBudget = totalBudget - BigInt(cycleReport.net);
+    const spendingAccount = accounts.find(
+      (a) => a.id === settings.defaults?.SPENDING,
+    );
+    const spendingBalance = BigInt(spendingAccount?.balance ?? "0");
+    const spendableNow =
+      remainingBudget > 0n && spendingBalance > 0n
+        ? remainingBudget < spendingBalance
+          ? remainingBudget
+          : spendingBalance
+        : 0n;
     const filter = [p.deleted ? 1 : 0, start, end],
       clauses = ["t.deleted=?", "t.date>=?", "t.date<?"];
     if (p.account_id) {
@@ -1638,7 +1899,12 @@ export class Store {
       budget,
       budgetRows,
       totalBudget: String(totalBudget),
-      remainingBudget: String(totalBudget - BigInt(cycleReport.net)),
+      remainingBudget: String(remainingBudget),
+      spendingAccount: spendingAccount
+        ? { id: spendingAccount.id, name: spendingAccount.name }
+        : null,
+      spendingBalance: String(spendingBalance),
+      spendableNow: String(spendableNow),
       totalAssets: String(Object.values(balances).reduce((a, b) => a + b, 0n)),
       report,
       cycleReport,
@@ -1654,10 +1920,18 @@ export class Store {
       occurrences: this.all(
         "SELECT * FROM bill_occurrences WHERE status='PENDING' ORDER BY COALESCE(snoozed_to,due_date) LIMIT 100",
       ).map((b) => ({ ...b, amount_minor: String(b.amount_minor) })),
+      salaryIncomes: this.all(
+        "SELECT t.*,a.name destination_name FROM transactions t JOIN accounts a ON a.id=t.destination_id WHERE t.cycle_id=? AND t.kind='INCOME' AND t.salary=1 AND t.deleted=0 ORDER BY t.date DESC,t.created_at DESC",
+        cycle.id,
+      ).map((t) => ({ ...t, amount_minor: String(t.amount_minor) })),
       plans: this.all(
-        "SELECT * FROM allocation_plans ORDER BY created_at DESC LIMIT 30",
+        "SELECT * FROM allocation_plans WHERE deleted=0 ORDER BY created_at DESC LIMIT 30",
       ).map((p) => ({
         ...p,
+        salary: this.one(
+          "SELECT t.id,t.date,t.amount_minor,a.name destination_name FROM transactions t JOIN accounts a ON a.id=t.destination_id WHERE t.id=?",
+          p.salary_id,
+        ),
         data: JSON.parse(p.data),
         items: this.all(
           "SELECT * FROM allocation_items WHERE plan_id=?",
@@ -1856,6 +2130,7 @@ export class Store {
     const source = this.account(salary.destination_id),
       spending = this.account(p.spending_id),
       savings = p.savings_id ? this.account(p.savings_id) : null;
+    ensure(source.id !== savings?.id || source.id === spending.id, "储蓄账户不能与工资源账户相同");
     ensure(
       !savings || savings.id !== spending.id,
       "消费和储蓄请使用不同账户，或留在原账户",
@@ -1863,79 +2138,117 @@ export class Store {
     const cycle = this.one("SELECT * FROM cycles WHERE id=?", salary.cycle_id),
       budget = this.latestBudget("CYCLE", cycle.id);
     const report = this.report(cycle.start, cycle.end),
-      B = budget.items.reduce(
+      totalBudget = budget.items.reduce(
         (n, x) => n + (x.enabled ? BigInt(x.amount_minor) : 0n),
         0n,
-      );
-    const max = (a, b) => (a > b ? a : b),
-      min = (a, b) => (a < b ? a : b);
-    const target = max(0n, B - BigInt(report.net)),
+      ),
+      max = (a, b) => (a > b ? a : b),
+      min = (a, b) => (a < b ? a : b),
+      remainingBudget = max(0n, totalBudget - BigInt(report.net)),
       balances = this.balances(),
+      sourceBalance = balances[source.id] ?? 0n,
+      spendingBalance = balances[spending.id] ?? 0n,
       reserve = minor(p.reserve_minor ?? "0", { zero: true });
     let allocated = 0n;
-    for (const r of this.all(
-      "SELECT i.amount_minor FROM allocation_items i JOIN allocation_plans p ON p.id=i.plan_id WHERE p.salary_id=? AND i.status='RECORDED'",
-      salary.id,
+    for (const row of this.all(
+      "SELECT i.amount_minor FROM allocation_items i JOIN allocation_plans p ON p.id=i.plan_id JOIN transactions t ON t.id=p.salary_id WHERE t.cycle_id=? AND p.deleted=0 AND i.status='RECORDED'",
+      cycle.id,
     ))
-      allocated += BigInt(r.amount_minor);
-    const cap = minor(p.cap_minor ?? String(salary.amount_minor), {
-      zero: true,
-    });
-    ensure(cap <= BigInt(salary.amount_minor), "分配上限不能超过本次工资");
-    const available = min(
-      max(0n, cap - allocated),
-      max(0n, (balances[source.id] ?? 0n) - reserve),
+      allocated += BigInt(row.amount_minor);
+    let cycleSalary = 0n;
+    for (const row of this.all(
+      "SELECT amount_minor FROM transactions WHERE cycle_id=? AND kind='INCOME' AND salary=1 AND deleted=0",
+      cycle.id,
+    ))
+      cycleSalary += BigInt(row.amount_minor);
+    const limitMode = p.limit_mode ?? (p.cap_minor != null ? "CUSTOM" : "CYCLE_SALARY");
+    ensure(
+      ["CYCLE_SALARY", "SOURCE_BALANCE", "CUSTOM"].includes(limitMode),
+      "分配上限口径无效",
     );
-    const needed = max(0n, target - max(0n, balances[spending.id] ?? 0n));
+    const cap =
+      limitMode === "CYCLE_SALARY"
+        ? cycleSalary
+        : limitMode === "SOURCE_BALANCE"
+          ? max(0n, sourceBalance)
+          : minor(p.cap_minor, { zero: true });
+    const countedAllocation =
+      limitMode === "SOURCE_BALANCE" ? 0n : allocated;
+    const available = min(
+      max(0n, cap - countedAllocation),
+      max(0n, sourceBalance - reserve),
+    );
+    const needed = max(0n, remainingBudget - max(0n, spendingBalance));
     const topup = source.id === spending.id ? 0n : min(needed, available);
     const saving =
       source.id === spending.id
-        ? min(
-            available,
-            max(0n, (balances[source.id] ?? 0n) - reserve - target),
-          )
-        : max(0n, available - topup);
+        ? savings
+          ? min(available, max(0n, sourceBalance - reserve - remainingBudget))
+          : 0n
+        : savings
+          ? max(0n, available - topup)
+          : 0n;
     const items = [];
     if (topup)
       items.push({
         source_id: source.id,
         destination_id: spending.id,
         amount_minor: String(topup),
+        purpose: "SPENDING_TOPUP",
       });
     if (saving && savings && savings.id !== source.id)
       items.push({
         source_id: source.id,
         destination_id: savings.id,
         amount_minor: String(saving),
+        purpose: "SAVINGS",
       });
     return {
-      target: String(target),
+      cycle_id: cycle.id,
+      cycle_start: cycle.start,
+      cycle_end: cycle.end,
+      source_name: source.name,
+      spending_name: spending.name,
+      savings_name: savings?.name ?? "",
+      selected_salary: String(salary.amount_minor),
+      cycle_salary: String(cycleSalary),
+      total_budget: String(totalBudget),
+      net_spent: String(report.net),
+      remaining_budget: String(remainingBudget),
+      target: String(remainingBudget),
+      source_balance: String(sourceBalance),
+      spending_balance: String(spendingBalance),
+      reserve: String(reserve),
+      cap: String(cap),
+      allocated: String(allocated),
+      available: String(available),
       needed: String(needed),
       topup: String(topup),
       saving: String(saving),
       shortage: String(max(0n, needed - available)),
+      limit_mode: limitMode,
       revision: this.settings().revision,
       items,
-      input: p,
+      input: { ...p, limit_mode: limitMode, cap_minor: String(cap) },
     };
-  }
-  saveAllocation(p) {
+  }  saveAllocation(p) {
     ensure(
       p.expected_revision === this.settings().revision,
       "余额或预算已变化，请重新计算",
     );
+    const salary = this.tx(p.salary_id);
     ensure(
       !this.one(
-        "SELECT id FROM allocation_plans WHERE salary_id=? AND status IN('DRAFT','PARTIAL')",
-        p.salary_id,
+        "SELECT p.id FROM allocation_plans p JOIN transactions t ON t.id=p.salary_id WHERE t.cycle_id=? AND p.deleted=0 AND p.status IN('DRAFT','PARTIAL')",
+        salary.cycle_id,
       ),
-      "此工资已有未完成计划，请先完成或取消",
+      "本周期已有未完成计划，请先完成或取消",
     );
     const q = this.allocationQuote(p);
     ensure(q.items.length, "无需转账，资金可以留在原账户");
     const planId = id();
     this.run(
-      "INSERT INTO allocation_plans VALUES(?,?,?,'DRAFT',1,?)",
+      "INSERT INTO allocation_plans(id,salary_id,data,status,revision,created_at,deleted) VALUES(?,?,?,'DRAFT',1,?,0)",
       planId,
       p.salary_id,
       json(q),
@@ -2011,6 +2324,24 @@ export class Store {
       this.one("SELECT * FROM allocation_items WHERE id=?", item.id),
     );
   }
+  confirmAllocationPlan(p) {
+    const plan = this.one(
+      "SELECT * FROM allocation_plans WHERE id=? AND deleted=0",
+      p.id,
+    );
+    ensure(plan && ["DRAFT", "PARTIAL"].includes(plan.status), "分配计划已处理");
+    const items = this.all(
+      "SELECT id FROM allocation_items WHERE plan_id=? AND status='PENDING' ORDER BY id",
+      plan.id,
+    );
+    ensure(items.length, "没有待记录的分配项");
+    for (const item of items)
+      this.confirmAllocation({
+        id: item.id,
+        date: p.date || this.clock(),
+      });
+    return { recorded: items.length };
+  }
   cancelAllocation(p) {
     const plan = this.one("SELECT * FROM allocation_plans WHERE id=?", p.id);
     ensure(plan, "计划不存在");
@@ -2028,6 +2359,25 @@ export class Store {
       plan,
       this.one("SELECT * FROM allocation_plans WHERE id=?", p.id),
       "取消未完成分配",
+    );
+  }
+  deleteAllocation(p) {
+    const plan = this.one(
+      "SELECT * FROM allocation_plans WHERE id=? AND deleted=0",
+      p.id,
+    );
+    ensure(plan, "计划不存在");
+    ensure(plan.status === "CANCELLED", "请先取消未完成的分配计划");
+    this.run(
+      "UPDATE allocation_plans SET deleted=1,revision=revision+1 WHERE id=?",
+      plan.id,
+    );
+    this.audit(
+      "allocation",
+      plan.id,
+      plan,
+      this.one("SELECT * FROM allocation_plans WHERE id=?", plan.id),
+      "隐藏已取消的分配计划",
     );
   }
   commitImport(p) {
@@ -2134,7 +2484,7 @@ export class Store {
       fs.renameSync(tmp, file);
       const manifest = {
         format: 1,
-        app_version: "0.4.0",
+        app_version: "0.5.0",
         schema_version: 1,
         created_at: now(),
         kind,

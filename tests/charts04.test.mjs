@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { trendData, pieData } from "../core/charts.mjs";
 import { Store } from "../core/store.mjs";
+import { amountVisible } from "../core/presentation.mjs";
 test("截图场景：30天工资周期只显示已发生2天，保留逐日金额", () => {
   const c = trendData(
     [
@@ -83,4 +84,25 @@ test("五种新增配色持久化、独立于明暗模式、不改变财务数�
   const other = new Store(path.join(dir, "ledger.sqlite"));
   assert.equal(other.settings().palette, "slate");
   other.close();
+});
+
+test("金额显示必须同时通过总开关与局部开关", () => {
+  const settings = {
+    hide_amounts: false,
+    amount_visibility: {
+      master: true,
+      overview: { budget: false, income: true },
+      accounts: { accountA: false, accountB: true },
+    },
+  };
+  assert.equal(amountVisible(settings), true);
+  assert.equal(amountVisible(settings, "overview", "budget"), false);
+  assert.equal(amountVisible(settings, "overview", "income"), true);
+  assert.equal(amountVisible(settings, "overview", "assets"), true);
+  assert.equal(amountVisible(settings, "account", "accountA"), false);
+  assert.equal(amountVisible(settings, "account", "accountB"), true);
+  settings.amount_visibility.master = false;
+  assert.equal(amountVisible(settings, "overview", "income"), false);
+  assert.equal(amountVisible(settings, "account", "accountB"), false);
+  assert.equal(amountVisible({ hide_amounts: true }), false);
 });

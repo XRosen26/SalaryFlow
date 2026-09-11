@@ -1,6 +1,7 @@
 import { Trend, Composition } from "./Charts";
 import { t as msg, tr, getLocale, changeLocale } from "./i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -40,8 +41,12 @@ import {
   FileText,
 } from "lucide-react";
 import { Help } from "./Help";
-import { budgetColor } from "../core/presentation.mjs";
-import { parseMoney, decimal } from "../core/money.mjs";
+import { amountVisible, budgetColor } from "../core/presentation.mjs";
+import { decimal } from "../core/money.mjs";
+import {
+  isMoneyExpression,
+  parseMoneyExpression,
+} from "../core/money-expression.mjs";
 import { timeRange, addDays } from "../core/dates.mjs";
 type Data = Record<string, any>;
 declare global {
@@ -67,6 +72,7 @@ async function api(method: string, payload: Data = {}) {
   if (!r.ok) throw new Error(msg(r.error || "操作失败"));
   return r.data;
 }
+const localized = (value: any) => msg(String(value ?? ""));
 const money = (v: any) => {
   const s = decimal(v ?? "0"),
     [a, b] = s.split(".");
@@ -89,6 +95,7 @@ const pages = [
   { key: "overview", label: msg("总览"), icon: LayoutDashboard },
   { key: "transactions", label: msg("交易记录"), icon: ArrowLeftRight },
   { key: "budget", label: msg("预算与周期"), icon: Wallet },
+  { key: "allocations", label: msg("工资分配"), icon: Sparkles },
   { key: "accounts", label: msg("我的账户"), icon: Landmark },
   { key: "analysis", label: msg("统计分析"), icon: ChartNoAxesCombined },
   { key: "settings", label: msg("设置与数据"), icon: Settings2 },
@@ -121,6 +128,88 @@ type Field = {
   visible?: (values: Data) => boolean;
   presets?: { label: string; value: string }[];
 };
+function TooltipPortal({
+  anchor,
+  text,
+}: {
+  anchor: HTMLElement | null;
+  text: string;
+}) {
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    const update = () => redraw((value) => value + 1);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, []);
+  if (!anchor) return null;
+  const box = anchor.getBoundingClientRect();
+  const width = Math.min(320, Math.max(160, window.innerWidth - 24));
+  const left = Math.min(
+    Math.max(box.left + box.width / 2, 12 + width / 2),
+    window.innerWidth - 12 - width / 2,
+  );
+  const above = box.top >= 96;
+  return createPortal(
+    <span
+      className={`tooltip-portal ${above ? "above" : "below"}`}
+      role="tooltip"
+      style={{
+        left,
+        top: above ? box.top - 9 : box.bottom + 9,
+        maxWidth: width,
+      }}
+    >
+      {text}
+    </span>,
+    document.body,
+  );
+}
+function HoverHint({ text, children }: { text: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLSpanElement>(null);
+  return (
+    <span
+      ref={anchor}
+      className="hover-hint has-tooltip"
+      aria-label={text}
+      aria-expanded={open}
+      data-open={open ? "true" : "false"}
+      tabIndex={0}
+      onPointerEnter={() => setOpen(true)}
+      onPointerLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      {children}
+      {open && <TooltipPortal anchor={anchor.current} text={text} />}
+    </span>
+  );
+}
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLSpanElement>(null);
+  return (
+    <span
+      ref={anchor}
+      className="help-tip has-tooltip"
+      aria-label={text}
+      aria-expanded={open}
+      data-open={open ? "true" : "false"}
+      tabIndex={0}
+      onPointerEnter={() => setOpen(true)}
+      onPointerLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      <CircleHelp size={15} />
+      {open && <TooltipPortal anchor={anchor.current} text={text} />}
+    </span>
+  );
+}
 function Form({
   fields,
   initial = {},
@@ -148,7 +237,19 @@ function Form({
         setBusy(true);
         setError("");
         try {
-          await onSubmit(values, op.current);
+          const submitted = { ...values };
+          for (const field of fields)
+            if (
+              field.type === "money" &&
+              String(submitted[field.name] ?? "").trim()
+            )
+              submitted[field.name] = decimal(
+                parseMoneyExpression(submitted[field.name], {
+                  signed: true,
+                  zero: true,
+                }),
+              );
+          await onSubmit(submitted, op.current);
         } catch (e: any) {
           setError(msg(e.message));
           op.current = crypto.randomUUID();
@@ -165,16 +266,7 @@ function Form({
             <label className={f.type === "textarea" ? "wide" : ""} key={f.name}>
               <span>
                 {f.label}
-                {f.explain && (
-                  <span
-                    tabIndex={0}
-                    className="help-tip"
-                    title={f.explain}
-                    aria-label={f.explain}
-                  >
-                    <CircleHelp size={15} />
-                  </span>
-                )}
+                {f.explain && <InfoTip text={f.explain} />}
                 {f.required !== false && f.type !== "checkbox" && (
                   <b className="required"> *</b>
                 )}
@@ -215,17 +307,25 @@ function Form({
                 </div>
               ) : (
                 <input
-                  type={f.type || "text"}
+                  type={f.type === "money" ? "text" : f.type || "text"}
+                  inputMode={f.type === "money" ? "decimal" : undefined}
                   value={values[f.name] ?? ""}
                   required={f.required !== false}
                   step={f.type === "number" ? "1" : undefined}
                   onChange={(e) =>
                     setValues({ ...values, [f.name]: e.target.value })
                   }
-                  maxLength={f.type === "text" || !f.type ? 200 : undefined}
+                  maxLength={
+                    f.type === "money" || f.type === "text" || !f.type
+                      ? 200
+                      : undefined
+                  }
                 />
               )}{" "}
               {f.hint && f.type !== "checkbox" && <small>{f.hint}</small>}
+              {f.type === "money" && isMoneyExpression(values[f.name]) && (
+                <MoneyExpressionResult value={values[f.name]} />
+              )}
               {f.presets && (
                 <div className="quick-presets">
                   {f.presets.map((x) => (
@@ -263,6 +363,28 @@ function Form({
     </form>
   );
 }
+function MoneyExpressionResult({ value }: { value: string }) {
+  try {
+    return (
+      <small className="money-expression-result">
+        {msg("计算结果")}：¥{" "}
+        {money(
+          parseMoneyExpression(value, {
+            signed: true,
+            zero: true,
+          }),
+        )}
+      </small>
+    );
+  } catch {
+    return (
+      <small className="money-expression-result error">
+        {msg("请检查金额算式")}
+      </small>
+    );
+  }
+}
+
 function Modal({
   title,
   subtitle,
@@ -464,12 +586,42 @@ export default function App() {
       setToast(msg(e.message));
     }
   }
-  const fmt = (v: any) => (data?.settings.hide_amounts ? "••••" : money(v));
+  const canShowAmount = (scope = "global", key = "") =>
+    amountVisible(data?.settings, scope, key);
+  const localAllowsAmount = (scope: string, key: string) => {
+    const current = data?.settings.amount_visibility;
+    if (scope === "overview") return current?.overview?.[key] !== false;
+    if (scope === "account") return current?.accounts?.[key] !== false;
+    if (scope === "accountSummary") return current?.account_summary !== false;
+    return canShowAmount();
+  };
+  const fmt = (v: any, scope = "global", key = "") =>
+    canShowAmount(scope, key) ? money(v) : "••••";
+  async function toggleAmount(scope = "global", key = "") {
+    const current = data?.settings.amount_visibility ?? {};
+    const next = {
+      master:
+        typeof current.master === "boolean"
+          ? current.master
+          : !data?.settings.hide_amounts,
+      overview: { ...(current.overview ?? {}) },
+      accounts: { ...(current.accounts ?? {}) },
+      account_summary: current.account_summary !== false,
+    };
+    if (scope === "global") next.master = !next.master;
+    else if (scope === "overview")
+      next.overview[key] = !localAllowsAmount(scope, key);
+    else if (scope === "account")
+      next.accounts[key] = !localAllowsAmount(scope, key);
+    else if (scope === "accountSummary")
+      next.account_summary = !localAllowsAmount(scope, key);
+    await mutate("saveSettings", { amount_visibility: next });
+  }
   const accounts = (data?.accounts || []).filter((a: Data) => !a.archived),
     cats = data?.categories || [];
   const accountOptions = accounts.map((a: Data) => ({
     value: a.id,
-    label: a.name,
+    label: localized(a.name),
   }));
   const selectField = (
     name: string,
@@ -555,12 +707,13 @@ export default function App() {
     const fields: Field[] = [
       {
         name: "amount",
+        type: "money",
         label:
           type === "REFUND" ? msg("本次退款金额（元）") : msg("金额（元）"),
         hint:
           type === "REFUND"
             ? msg("快捷比例按剩余可退金额计算，向下取整到分")
-            : msg("最多两位小数"),
+            : msg("可输入金额或使用 + - * / ( ) 计算，结果四舍五入到分"),
         presets:
           type === "REFUND" && !old
             ? [25, 50, 75, 100].map((n) => ({
@@ -592,7 +745,7 @@ export default function App() {
         selectField("category_id", msg("分类"), [
           ...relevant.map((c: Data) => ({
             value: c.id,
-            label: `${c.group_name} / ${c.name}`,
+            label: `${localized(c.group_name)} / ${localized(c.name)}`,
           })),
           { value: "__custom", label: msg("其他 / 自定义名称") },
           ...(type === "INCOME"
@@ -688,19 +841,21 @@ export default function App() {
             fields={fields}
             initial={initial}
             onSubmit={async (p, op) => {
-              await mutate(
+              const result = await mutate(
                 old ? "edit" : "record",
                 {
                   ...p,
                   kind: type,
                   id: old?.id,
                   revision: old?.revision,
-                  amount_minor: parseMoney(p.amount),
+                  amount_minor: parseMoneyExpression(p.amount),
                   original_id: original?.id ?? old?.original_id,
                 },
                 op,
               );
               close();
+              if (!old && type === "INCOME" && p.salary)
+                goto("allocations", { cycle_id: result.cycle_id });
             }}
           />
         </>
@@ -731,7 +886,11 @@ export default function App() {
             },
             ...(!a
               ? [
-                  { name: "opening", label: msg("期初余额（元）") },
+                  {
+                    name: "opening",
+                    type: "money",
+                    label: msg("期初余额（元）"),
+                  },
                   {
                     name: "start_date",
                     label: msg("余额基准日"),
@@ -746,6 +905,15 @@ export default function App() {
               hint: msg("可与其他用途同时选择"),
               required: false,
             })),
+            {
+              name: "valuation_mode",
+              label: msg("按估值管理余额"),
+              type: "checkbox",
+              hint: msg(
+                "适合理财账户：市值涨跌通过估值更新，不计为收入或支出；不能设为工资或消费账户。",
+              ),
+              required: false,
+            },
             {
               name: "hidden",
               label: msg("隐藏账户"),
@@ -768,7 +936,7 @@ export default function App() {
                 id: a?.id,
                 revision: a?.revision,
                 roles: Object.keys(roles).filter((r) => p[r]),
-                opening_minor: parseMoney(p.opening || "0", {
+                opening_minor: parseMoneyExpression(p.opening || "0", {
                   signed: true,
                   zero: true,
                 }),
@@ -780,6 +948,40 @@ export default function App() {
         />
       ),
     });
+  }
+  function updateValuation(a: Data) {
+    confirm(
+      msg("更新理财账户估值"),
+      msg(
+        "填写当日收盘后或当前看到的总市值。估值会包含保存前已记录的当日流水；之后新记的同日转账继续叠加。同一天再次保存会更新当天估值。",
+      ),
+      async (p, op) =>
+        mutate(
+          "saveValuation",
+          {
+            account_id: a.id,
+            date: p.date,
+            value_minor: parseMoneyExpression(p.value, { zero: true }),
+            note: p.note,
+          },
+          op,
+        ),
+      [
+        { name: "date", label: msg("估值日期"), type: "date" },
+        { name: "value", type: "money", label: msg("账户总市值（元）") },
+        {
+          name: "note",
+          label: msg("估值说明"),
+          type: "textarea",
+          required: false,
+        },
+      ],
+      {
+        date: data?.today,
+        value: decimal(a.balance),
+        note: "",
+      },
+    );
   }
   function categoryForm(c: Data | null = null) {
     setModal({
@@ -854,14 +1056,14 @@ export default function App() {
           }}
           fields={[
             { name: "name", label: msg("账单名称") },
-            { name: "amount", label: msg("预计金额（元）") },
+            { name: "amount", type: "money", label: msg("预计金额（元）") },
             selectField("account_id", msg("付款账户"), accountOptions),
             selectField(
               "category_id",
               msg("分类"),
               cats
                 .filter((c: Data) => c.kind === "EXPENSE" && !c.archived)
-                .map((c: Data) => ({ value: c.id, label: c.name })),
+                .map((c: Data) => ({ value: c.id, label: localized(c.name) })),
             ),
             selectField("frequency", msg("频率"), [
               { value: "MONTHLY", label: msg("每月") },
@@ -882,7 +1084,7 @@ export default function App() {
                 ...p,
                 id: b?.id,
                 revision: b?.revision,
-                amount_minor: parseMoney(p.amount),
+                amount_minor: parseMoneyExpression(p.amount),
               },
               op,
             );
@@ -901,14 +1103,14 @@ export default function App() {
           "processBill",
           {
             id: b.id,
-            amount_minor: parseMoney(p.amount),
+            amount_minor: parseMoneyExpression(p.amount),
             date: p.date,
             transaction_id: p.transaction_id || undefined,
           },
           op,
         ),
       [
-        { name: "amount", label: msg("实际金额（元）") },
+        { name: "amount", type: "money", label: msg("实际金额（元）") },
         { name: "date", label: msg("实际日期"), type: "date" },
         {
           name: "transaction_id",
@@ -993,7 +1195,7 @@ export default function App() {
             <dt>{msg("分类")}</dt>
             <dd>
               {t.group_name
-                ? `${t.group_name} / ${t.category_name}`
+                ? `${localized(t.group_name)} / ${localized(t.category_name)}`
                 : msg("不计预算")}
             </dd>
             <dt>{msg("备注")}</dt>
@@ -1235,6 +1437,7 @@ export default function App() {
     transactions: msg("真实记录每一笔，让账目始终清楚。"),
     budget: msg("预算先行，为生活留出从容。"),
     accounts: msg("钱在哪里，一目了然。"),
+    allocations: msg("工资到账后，补足生活资金，再安排储蓄与理财。"),
     analysis: msg("用真实记录，看见财务的变化。"),
     settings: msg("你的数据，由你掌握。"),
   };
@@ -1276,7 +1479,14 @@ export default function App() {
             <span>{msg("我")}</span>
             <div>
               <strong>{msg("我的账本")}</strong>
-              <small>{msg("人民币 · 工资周期")}</small>
+              <small>
+                {msg("人民币 · ")}
+                {(data.cycleRules.find(
+                  (r: Data) => r.effective_from <= data.today,
+                )?.basis ?? "SALARY") === "SALARY"
+                  ? msg("工资周期")
+                  : msg("自然月")}
+              </small>
             </div>
             <button
               className="icon-button"
@@ -1303,24 +1513,13 @@ export default function App() {
             </span>
             <button
               className="icon-button"
-              aria-label={msg("显示或隐藏金额")}
+              aria-label={msg("全局金额显示开关")}
               title={msg(
-                "隐藏金额仅遮挡界面数字，不加密账本，导出和编辑表单仍显示真实金额",
+                "总开关：关闭时所有金额均隐藏；打开后仍需相应卡片或账户允许显示",
               )}
-              onClick={() =>
-                act(() =>
-                  mutate("saveSettings", {
-                    theme: data.settings.theme,
-                    hide_amounts: !data.settings.hide_amounts,
-                  }),
-                )
-              }
+              onClick={() => act(() => toggleAmount())}
             >
-              {data.settings.hide_amounts ? (
-                <EyeOff size={18} />
-              ) : (
-                <Eye size={18} />
-              )}
+              {canShowAmount() ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
             <button
               className="icon-button"
@@ -1333,7 +1532,6 @@ export default function App() {
                       document.documentElement.dataset.theme === "dark"
                         ? "light"
                         : "dark",
-                    hide_amounts: data.settings.hide_amounts,
                   }),
                 )
               }
@@ -1447,25 +1645,70 @@ export default function App() {
                       <span className="live-dot" />
                       {msg("本周期剩余预算")}
                     </span>
-                    <span className="tag ghost">
-                      {data.cycle.status === "CLOSED"
-                        ? msg("已结算")
-                        : msg("进行中")}
-                    </span>
+                    <div className="card-head-actions">
+                      <button
+                        className="card-amount-toggle"
+                        aria-label={msg("切换本周期预算卡金额")}
+                        title={msg(
+                          "仅控制本周期预算卡；全局金额显示关闭时仍会隐藏",
+                        )}
+                        onClick={() =>
+                          act(() => toggleAmount("overview", "budget"))
+                        }
+                      >
+                        {localAllowsAmount("overview", "budget") ? (
+                          <Eye size={16} />
+                        ) : (
+                          <EyeOff size={16} />
+                        )}
+                      </button>
+                      <span className="tag ghost">
+                        {data.cycle.status === "CLOSED"
+                          ? msg("已结算")
+                          : msg("进行中")}
+                      </span>
+                    </div>
                   </div>
                   <div className="hero-number">
                     <span>¥</span>
-                    {fmt(data.remainingBudget)}
+                    {fmt(data.remainingBudget, "overview", "budget")}
                   </div>
-                  <p>{msg("规划中的可花额度 · 不等于银行卡余额")}</p>
+                  <p>{msg("预算余额是计划额度；消费账户余额是实际资金。")}</p>
+                  <div className="budget-reality">
+                    <span>
+                      <small>
+                        {data.spendingAccount
+                          ? localized(data.spendingAccount.name) + msg("余额")
+                          : msg("主要消费账户未设置")}
+                      </small>
+                      <strong>
+                        ¥ {fmt(data.spendingBalance, "overview", "budget")}
+                      </strong>
+                    </span>
+                    <span>
+                      <small>
+                        {msg("当前可安心支出")}
+                        <InfoTip
+                          text={msg(
+                            "取本周期剩余预算与主要消费账户可用余额中较小的非负值",
+                          )}
+                        />
+                      </small>
+                      <strong>
+                        ¥ {fmt(data.spendableNow, "overview", "budget")}
+                      </strong>
+                    </span>
+                  </div>
                   <div className="hero-bottom">
                     <div>
                       <small>{msg("本周期预算")}</small>
-                      <strong>¥ {fmt(data.totalBudget)}</strong>
+                      <strong>
+                        ¥ {fmt(data.totalBudget, "overview", "budget")}
+                      </strong>
                     </div>
                     <div>
                       <small>{msg("已用净支出")}</small>
-                      <strong>¥ {fmt(s.net)}</strong>
+                      <strong>¥ {fmt(s.net, "overview", "budget")}</strong>
                     </div>
                     <button
                       onClick={() =>
@@ -1484,14 +1727,32 @@ export default function App() {
                       <ArrowDownLeft size={19} />
                     </span>
                     {msg("本周期收入")}
+                    <button
+                      className="card-amount-toggle"
+                      aria-label={msg("切换本周期收入卡金额")}
+                      title={msg(
+                        "仅控制本周期收入卡；全局金额显示关闭时仍会隐藏",
+                      )}
+                      onClick={() =>
+                        act(() => toggleAmount("overview", "income"))
+                      }
+                    >
+                      {localAllowsAmount("overview", "income") ? (
+                        <Eye size={16} />
+                      ) : (
+                        <EyeOff size={16} />
+                      )}
+                    </button>
                   </div>
-                  <h2>¥ {fmt(s.income)}</h2>
+                  <h2>¥ {fmt(s.income, "overview", "income")}</h2>
                   <div className="mini-divider" />
                   <div className="metric-label">
                     {msg("本周期净结余")}
                     <span className="muted">{msg("收入 − 净支出")}</span>
                   </div>
-                  <strong className="medium-number">¥ {fmt(s.saving)}</strong>
+                  <strong className="medium-number">
+                    ¥ {fmt(s.saving, "overview", "income")}
+                  </strong>
                   <div className="metric-foot">
                     <span>{msg("储蓄率")}</span>
                     <b className="positive">
@@ -1505,8 +1766,24 @@ export default function App() {
                       <Landmark size={19} />
                     </span>
                     {msg("账户总资产")}
+                    <button
+                      className="card-amount-toggle"
+                      aria-label={msg("切换账户总资产卡金额")}
+                      title={msg(
+                        "仅控制账户总资产卡；全局金额显示关闭时仍会隐藏",
+                      )}
+                      onClick={() =>
+                        act(() => toggleAmount("overview", "assets"))
+                      }
+                    >
+                      {localAllowsAmount("overview", "assets") ? (
+                        <Eye size={16} />
+                      ) : (
+                        <EyeOff size={16} />
+                      )}
+                    </button>
                   </div>
-                  <h2>¥ {fmt(data.totalAssets)}</h2>
+                  <h2>¥ {fmt(data.totalAssets, "overview", "assets")}</h2>
                   <p className="muted">
                     {msg("包含全部账户，隐藏与归档不影响合计")}
                   </p>
@@ -1758,7 +2035,7 @@ export default function App() {
                     <option value="">{msg("全部账户")}</option>
                     {data.accounts.map((a: Data) => (
                       <option key={a.id} value={a.id}>
-                        {a.name}
+                        {localized(a.name)}
                       </option>
                     ))}
                   </select>
@@ -1810,23 +2087,41 @@ export default function App() {
                     {addDays(query.end || data.cycle.end, -1)}
                   </span>
                   <div>
-                    <button
-                      disabled={!data.page}
-                      onClick={() =>
-                        setQuery({ ...query, page: data.page - 1 })
+                    <HoverHint
+                      text={
+                        data.page
+                          ? msg("查看上一页交易")
+                          : msg("已经是第一页，没有上一页。")
                       }
                     >
-                      <ChevronLeft size={16} />
-                    </button>
+                      <button
+                        disabled={!data.page}
+                        aria-label={msg("上一页")}
+                        onClick={() =>
+                          setQuery({ ...query, page: data.page - 1 })
+                        }
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                    </HoverHint>
                     <span>{data.page + 1}</span>
-                    <button
-                      disabled={(data.page + 1) * 100 >= data.total}
-                      onClick={() =>
-                        setQuery({ ...query, page: data.page + 1 })
+                    <HoverHint
+                      text={
+                        (data.page + 1) * 100 >= data.total
+                          ? msg("已经是最后一页，没有下一页。")
+                          : msg("查看下一页交易")
                       }
                     >
-                      <ChevronRight size={16} />
-                    </button>
+                      <button
+                        disabled={(data.page + 1) * 100 >= data.total}
+                        aria-label={msg("下一页")}
+                        onClick={() =>
+                          setQuery({ ...query, page: data.page + 1 })
+                        }
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </HoverHint>
                   </div>
                 </div>
               </section>
@@ -1899,7 +2194,7 @@ export default function App() {
                           {
                             cycle_id: data.cycle.id,
                             amount_minor: p.amount
-                              ? parseMoney(p.amount, { zero: true })
+                              ? parseMoneyExpression(p.amount, { zero: true })
                               : null,
                           },
                           op,
@@ -1907,6 +2202,7 @@ export default function App() {
                       [
                         {
                           name: "amount",
+                          type: "money",
                           label: msg("本周期预计收入（元）"),
                           required: false,
                         },
@@ -2018,14 +2314,26 @@ export default function App() {
                     {msg("结算本周期")}
                   </button>
                 )}
-                <button
-                  className="primary"
-                  disabled={data.cycle.status === "CLOSED"}
-                  onClick={() => budgetEditor()}
+                <HoverHint
+                  text={
+                    data.cycle.status === "CLOSED"
+                      ? msg(
+                          "本周期已经结算。请先重新打开周期，再调整本周期预算。",
+                        )
+                      : msg(
+                          "修改当前周期的分类预算；可选择同时更新个人默认预算。",
+                        )
+                  }
                 >
-                  <Pencil size={16} />
-                  {msg("调整预算")}
-                </button>
+                  <button
+                    className="primary"
+                    disabled={data.cycle.status === "CLOSED"}
+                    onClick={() => budgetEditor()}
+                  >
+                    <Pencil size={16} />
+                    {msg("调整预算")}
+                  </button>
+                </HoverHint>
               </div>
               <div className="stat-strip">
                 {[
@@ -2126,12 +2434,38 @@ export default function App() {
               )}
             </>
           )}
+          {page === "allocations" && (
+            <AllocationCenter
+              data={data}
+              onAllocate={allocation}
+              onRecordSalary={() => transaction("INCOME")}
+              mutate={mutate}
+              ask={confirm}
+              format={fmt}
+            />
+          )}
           {page === "accounts" && (
             <>
               <div className="section-actions">
                 <div className="asset-total">
                   <small>{msg("全部账户总资产")}</small>
-                  <strong>¥ {fmt(data.totalAssets)}</strong>
+                  <div className="asset-total-value">
+                    <strong>¥ {fmt(data.totalAssets, "accountSummary")}</strong>
+                    <button
+                      className="card-amount-toggle"
+                      aria-label={msg("切换全部账户总资产金额")}
+                      title={msg(
+                        "仅控制“我的账户”页总资产；全局金额显示关闭时仍会隐藏",
+                      )}
+                      onClick={() => act(() => toggleAmount("accountSummary"))}
+                    >
+                      {localAllowsAmount("accountSummary", "") ? (
+                        <Eye size={17} />
+                      ) : (
+                        <EyeOff size={17} />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <button
                   onClick={() =>
@@ -2147,7 +2481,10 @@ export default function App() {
                           msg("主要") + roles[r] + msg("账户"),
                           accounts
                             .filter((a: Data) => a.roles.includes(r))
-                            .map((a: Data) => ({ value: a.id, label: a.name })),
+                            .map((a: Data) => ({
+                              value: a.id,
+                              label: localized(a.name),
+                            })),
                           false,
                         ),
                       ),
@@ -2176,18 +2513,37 @@ export default function App() {
                       <span className="bank-symbol">
                         <Landmark size={23} />
                       </span>
-                      <span>{a.type_name}</span>
-                      <button
-                        className="icon-button"
-                        aria-label={msg("编辑") + a.name}
-                        onClick={() => editAccount(a)}
-                      >
-                        <Pencil size={17} />
-                      </button>
+                      <span>{localized(a.type_name)}</span>
+                      <div className="account-head-actions">
+                        <button
+                          className="icon-button"
+                          aria-label={msg("切换账户金额") + a.name}
+                          title={msg(
+                            "仅控制此账户；全局金额显示关闭时仍会隐藏",
+                          )}
+                          onClick={() =>
+                            act(() => toggleAmount("account", a.id))
+                          }
+                        >
+                          {localAllowsAmount("account", a.id) ? (
+                            <Eye size={17} />
+                          ) : (
+                            <EyeOff size={17} />
+                          )}
+                        </button>
+                        <button
+                          className="icon-button"
+                          aria-label={msg("编辑") + a.name}
+                          title={msg("编辑") + a.name}
+                          onClick={() => editAccount(a)}
+                        >
+                          <Pencil size={17} />
+                        </button>
+                      </div>
                     </div>
                     <h3>
-                      {a.name}
-                      {a.archived && <small>{msg("（已归档）")}</small>}
+                      {localized(a.name)}
+                      {!!a.archived && <small>{msg("（已归档）")}</small>}
                     </h3>
                     <p>
                       {a.roles
@@ -2201,25 +2557,36 @@ export default function App() {
                       {a.hidden ? msg("· 已隐藏") : ""}
                     </p>
                     <strong className="account-balance">
-                      ¥ {fmt(a.balance)}
+                      ¥ {fmt(a.balance, "account", a.id)}
                     </strong>
                     <div className="account-date">
-                      {msg("余额基准日")}
-                      {a.start_date}
+                      {a.valuation_mode
+                        ? a.last_valuation
+                          ? msg("最新估值") + " " + a.last_valuation.date
+                          : msg("尚未录入估值，当前按流水余额显示")
+                        : msg("余额基准日") + a.start_date}
                     </div>
                     <div className="account-tools">
-                      <button
-                        disabled={i === 0}
-                        onClick={() =>
-                          act(async () => {
-                            const ids = data.accounts.map((x: Data) => x.id);
-                            [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]];
-                            await mutate("orderAccounts", { ids });
-                          })
+                      <HoverHint
+                        text={
+                          i === 0
+                            ? msg("这个账户已经排在最前面，不能继续上移。")
+                            : msg("将这个账户向前移动一位。")
                         }
                       >
-                        {msg("上移")}
-                      </button>
+                        <button
+                          disabled={i === 0}
+                          onClick={() =>
+                            act(async () => {
+                              const ids = data.accounts.map((x: Data) => x.id);
+                              [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]];
+                              await mutate("orderAccounts", { ids });
+                            })
+                          }
+                        >
+                          {msg("上移")}
+                        </button>
+                      </HoverHint>
                       <button
                         onClick={() =>
                           goto("transactions", {
@@ -2232,111 +2599,157 @@ export default function App() {
                         {msg("交易明细")}
                         <ChevronRight size={14} />
                       </button>
-                      <button
-                        onClick={() =>
-                          confirm(
-                            msg("余额校准"),
-                            tr(
-                              "当前账面余额 ¥{0}。差额将作为单独调整记录，不计收入与支出。",
-                              fmt(a.balance),
-                            ),
-                            async (p, op) =>
-                              mutate(
-                                "calibrate",
-                                {
-                                  account_id: a.id,
-                                  actual_minor: parseMoney(p.actual, {
-                                    signed: true,
-                                    zero: true,
-                                  }),
-                                  reason: p.reason,
-                                },
-                                op,
+                      {a.valuation_mode ? (
+                        <HoverHint
+                          text={msg(
+                            "录入某日账户总市值。市值涨跌只改变资产余额，不计为收入或支出。",
+                          )}
+                        >
+                          <button onClick={() => updateValuation(a)}>
+                            {msg("更新估值")}
+                          </button>
+                        </HoverHint>
+                      ) : (
+                        <HoverHint
+                          text={msg(
+                            "将账面余额调整为实际余额；产生的差额属于校准，不计收入、支出或预算。",
+                          )}
+                        >
+                          <button
+                            onClick={() =>
+                              confirm(
+                                msg("余额校准"),
+                                tr(
+                                  "当前账面余额 ¥{0}。差额将作为单独调整记录，不计收入与支出。",
+                                  fmt(a.balance, "account", a.id),
+                                ),
+                                async (p, op) =>
+                                  mutate(
+                                    "calibrate",
+                                    {
+                                      account_id: a.id,
+                                      actual_minor: parseMoneyExpression(
+                                        p.actual,
+                                        {
+                                          signed: true,
+                                          zero: true,
+                                        },
+                                      ),
+                                      reason: p.reason,
+                                    },
+                                    op,
+                                  ),
+                                [
+                                  {
+                                    name: "actual",
+                                    type: "money",
+                                    label: msg("银行实际余额（元）"),
+                                  },
+                                  { name: "reason", label: msg("校准原因") },
+                                ],
+                                { actual: decimal(a.balance) },
+                              )
+                            }
+                          >
+                            {msg("校准")}
+                          </button>
+                        </HoverHint>
+                      )}
+                      <HoverHint
+                        text={msg(
+                          "把账户记账起点向更早日期扩展，需要填写新起点当时的真实余额。",
+                        )}
+                      >
+                        <button
+                          onClick={() =>
+                            confirm(
+                              msg("扩展记账起点"),
+                              msg(
+                                "需要提供更早日期开始前的真实余额。不会把历史消费重复叠加在原期初之上。",
                               ),
-                            [
-                              {
-                                name: "actual",
-                                label: msg("银行实际余额（元）"),
-                              },
-                              { name: "reason", label: msg("校准原因") },
-                            ],
-                            { actual: decimal(a.balance) },
-                          )
+                              async (p, op) =>
+                                mutate(
+                                  "changeStart",
+                                  {
+                                    account_id: a.id,
+                                    revision: a.revision,
+                                    start_date: p.start_date,
+                                    opening_minor: parseMoneyExpression(
+                                      p.opening,
+                                      {
+                                        signed: true,
+                                        zero: true,
+                                      },
+                                    ),
+                                    reason: p.reason,
+                                  },
+                                  op,
+                                ),
+                              [
+                                {
+                                  name: "start_date",
+                                  label: msg("更早基准日"),
+                                  type: "date",
+                                },
+                                {
+                                  name: "opening",
+                                  type: "money",
+                                  label: msg("当时的期初余额（元）"),
+                                },
+                                { name: "reason", label: msg("原因") },
+                              ],
+                              { start_date: a.start_date },
+                            )
+                          }
+                        >
+                          {msg("起点")}
+                        </button>
+                      </HoverHint>
+                      <HoverHint
+                        text={
+                          a.archived
+                            ? msg(
+                                "恢复后账户会重新出现在日常选择中，历史记录始终保留。",
+                              )
+                            : msg(
+                                "归档后账户不再用于新交易，但余额和历史记录仍保留在总资产中。",
+                              )
                         }
                       >
-                        {msg("校准")}
-                      </button>
-                      <button
-                        onClick={() =>
-                          confirm(
-                            msg("扩展记账起点"),
-                            msg(
-                              "需要提供更早日期开始前的真实余额。不会把历史消费重复叠加在原期初之上。",
-                            ),
-                            async (p, op) =>
-                              mutate(
-                                "changeStart",
-                                {
-                                  account_id: a.id,
-                                  revision: a.revision,
-                                  start_date: p.start_date,
-                                  opening_minor: parseMoney(p.opening, {
-                                    signed: true,
-                                    zero: true,
-                                  }),
-                                  reason: p.reason,
-                                },
-                                op,
+                        <button
+                          onClick={() =>
+                            confirm(
+                              a.archived
+                                ? msg("恢复账户")
+                                : msg("归档/删除账户"),
+                              msg(
+                                "归档保留全部历史；仅有零期初且未使用的账户可以删除。",
                               ),
-                            [
-                              {
-                                name: "start_date",
-                                label: msg("更早基准日"),
-                                type: "date",
-                              },
-                              {
-                                name: "opening",
-                                label: msg("当时的期初余额（元）"),
-                              },
-                              { name: "reason", label: msg("原因") },
-                            ],
-                            { start_date: a.start_date },
-                          )
-                        }
-                      >
-                        {msg("起点")}
-                      </button>
-                      <button
-                        onClick={() =>
-                          confirm(
-                            a.archived ? msg("恢复账户") : msg("归档/删除账户"),
-                            msg(
-                              "归档保留全部历史；仅有零期初且未使用的账户可以删除。",
-                            ),
-                            async (p, op) =>
-                              mutate(
-                                "archiveAccount",
+                              async (p, op) =>
+                                mutate(
+                                  "archiveAccount",
+                                  {
+                                    id: a.id,
+                                    revision: a.revision,
+                                    remove: p.remove,
+                                  },
+                                  op,
+                                ),
+                              [
                                 {
-                                  id: a.id,
-                                  revision: a.revision,
-                                  remove: p.remove,
+                                  name: "remove",
+                                  label: msg("删除未使用账户"),
+                                  type: "checkbox",
+                                  required: false,
+                                  hint: msg("有历史数据时请保持不勾选"),
                                 },
-                                op,
-                              ),
-                            [
-                              {
-                                name: "remove",
-                                label: msg("删除未使用账户"),
-                                type: "checkbox",
-                                required: false,
-                                hint: msg("有历史数据时请保持不勾选"),
-                              },
-                            ],
-                          )
-                        }
-                      >
-                        {a.archived ? msg("恢复") : msg("归档")}
-                      </button>
+                              ],
+                            )
+                          }
+                        >
+                          {a.archived ? msg("恢复") : msg("归档")}
+                        </button>
+                      </HoverHint>
                     </div>
                   </section>
                 ))}
@@ -2466,7 +2879,7 @@ export default function App() {
               <Composition
                 report={data.report}
                 accounts={data.accounts}
-                hidden={data.settings.hide_amounts}
+                hidden={!canShowAmount()}
                 onCategory={(id) =>
                   goto("transactions", {
                     start: data.report.start,
@@ -2494,7 +2907,7 @@ export default function App() {
                     days={data.report.days}
                     start={data.report.start}
                     end={data.report.end}
-                    hidden={data.settings.hide_amounts}
+                    hidden={!canShowAmount()}
                   />
                 </section>
                 <section className="panel">
@@ -2648,7 +3061,6 @@ export default function App() {
                   ["help", msg("帮助与使用手册")],
                   ["categories", msg("收支分类")],
                   ["bills", msg("固定账单")],
-                  ["allocations", msg("工资分配")],
                   ["data", msg("数据管理")],
                 ].map(([k, v]) => (
                   <button
@@ -2745,7 +3157,6 @@ export default function App() {
                         act(() =>
                           mutate("saveSettings", {
                             theme: e.target.value,
-                            hide_amounts: data.settings.hide_amounts,
                           }),
                         )
                       }
@@ -2757,61 +3168,117 @@ export default function App() {
                   </div>
                   <div className="setting-row">
                     <div>
-                      <h3>{msg("工资周期")}</h3>
+                      <h3>{msg("预算周期口径")}</h3>
                       <p>
-                        {data.cycleRules
-                          .filter((r: Data) => r.effective_from > data.today)
-                          .map(
-                            (r: Data) =>
-                              `${msg("待生效")}：${r.effective_from} · ${r.payday}`,
-                          )
-                          .join("；")}
+                        {msg(
+                          "预算按所选周期管理；统计分析始终按交易实际发生日期筛选。",
+                        )}
                       </p>
                       <p>
-                        {msg("当前规则：每月")}
-                        {
-                          data.cycleRules.find(
-                            (r: Data) => r.effective_from <= data.today,
-                          )?.payday
-                        }
-                        {msg("日。短月自动取月底。")}
+                        {msg("当前规则：")}
+                        {(data.cycleRules.find(
+                          (r: Data) => r.effective_from <= data.today,
+                        )?.basis ?? "SALARY") === "SALARY"
+                          ? msg("按工资周期")
+                          : msg("按自然月")}
+                        {(data.cycleRules.find(
+                          (r: Data) => r.effective_from <= data.today,
+                        )?.basis ?? "SALARY") === "SALARY"
+                          ? " · " +
+                            msg("每月") +
+                            (data.cycleRules.find(
+                              (r: Data) => r.effective_from <= data.today,
+                            )?.payday ?? data.settings.payday) +
+                            msg("日起算")
+                          : " · " + msg("每月1日起算")}
                       </p>
                       {data.cycleRules
                         .filter((r: Data) => r.effective_from > data.today)
                         .map((r: Data) => (
                           <p key={r.id}>
-                            {r.effective_from}
-                            {msg("起改为每月")}
-                            {r.payday}
-                            {msg("日")}
+                            {msg("待生效")}：{r.effective_from} ·{" "}
+                            {r.basis === "CALENDAR_MONTH"
+                              ? msg("按自然月")
+                              : msg("按工资周期，每月") +
+                                r.payday +
+                                msg("日起算")}
                           </p>
                         ))}
                     </div>
                     <button
-                      onClick={() =>
+                      onClick={() => {
+                        const active =
+                          data.cycleRules.find(
+                            (r: Data) => r.effective_from <= data.today,
+                          ) ?? {};
                         confirm(
-                          msg("修改工资日"),
+                          msg("修改预算周期规则"),
                           msg(
-                            "从下一周期边界生效。过渡周期可能较短，既有历史不重排。",
+                            "可立即应用、从下一个周期开始，或指定未来日期。若边界内已有交易，应用会阻止不安全的重划。",
                           ),
                           async (p, op) =>
                             mutate(
                               "setPayday",
-                              { payday: Number(p.payday) },
+                              {
+                                basis: p.basis,
+                                payday:
+                                  p.basis === "SALARY" ? Number(p.payday) : 1,
+                                mode: p.mode,
+                                effective_from:
+                                  p.mode === "CUSTOM"
+                                    ? p.effective_from
+                                    : undefined,
+                              },
                               op,
                             ),
                           [
+                            selectField("basis", msg("预算周期口径"), [
+                              {
+                                value: "SALARY",
+                                label: msg("按工资周期"),
+                              },
+                              {
+                                value: "CALENDAR_MONTH",
+                                label: msg("按自然月"),
+                              },
+                            ]),
                             {
                               name: "payday",
-                              label: msg("新工资日（1—31）"),
+                              label: msg("工资周期起始日（1—31）"),
                               type: "number",
+                              visible: (v) => v.basis === "SALARY",
+                            },
+                            selectField("mode", msg("生效方式"), [
+                              {
+                                value: "IMMEDIATE",
+                                label: msg("立即应用于当前周期"),
+                              },
+                              {
+                                value: "NEXT_CYCLE",
+                                label: msg("下一个周期开始生效"),
+                              },
+                              {
+                                value: "CUSTOM",
+                                label: msg("指定日期开始生效"),
+                              },
+                            ]),
+                            {
+                              name: "effective_from",
+                              label: msg("指定生效日期"),
+                              type: "date",
+                              visible: (v) => v.mode === "CUSTOM",
                             },
                           ],
-                          { payday: data.settings.payday },
-                        )
-                      }
+                          {
+                            basis: active.basis ?? "SALARY",
+                            payday: active.payday ?? data.settings.payday,
+                            mode: "NEXT_CYCLE",
+                            effective_from: addDays(data.today, 1),
+                          },
+                        );
+                      }}
                     >
-                      {msg("修改工资日")}
+                      {msg("修改周期规则")}
                     </button>
                   </div>
                   <div className="setting-row">
@@ -2839,13 +3306,18 @@ export default function App() {
                         <CircleHelp size={16} />
                         {msg("帮助与使用手册")}
                       </button>
-                      <p>{msg("SalaryFlow 0.4.0 · 本地个人预算与现金流")}</p>
                       <p>
                         {msg(
-                          "本版本支持人民币资产账户；信用卡负债、投资估值与财务目标将在后续迭代加入。",
+                          "SalaryFlow 0.6.2 · 本地个人预算、现金流与理财资产",
+                        )}
+                      </p>
+                      <p>
+                        {msg(
+                          "支持人民币资产账户、工资周期/自然月预算及理财估值；信用卡负债、多币种、银行直连和云同步尚未实现。",
                         )}
                       </p>
                     </div>
+                    <p>{msg("由 XRosen26 使用 Codex 完成。")}</p>
                     <ShieldCheck size={32} className="positive" />
                   </div>
                 </section>
@@ -2875,18 +3347,30 @@ export default function App() {
                     <tbody>
                       {cats.map((c: Data) => (
                         <tr key={c.id}>
-                          <td>{c.name}</td>
-                          <td>{c.group_name}</td>
+                          <td>{localized(c.name)}</td>
+                          <td>{localized(c.group_name)}</td>
                           <td>{kinds[c.kind]}</td>
                           <td>{c.archived ? msg("已归档") : msg("使用中")}</td>
                           <td className="row-actions">
-                            <button
-                              disabled={!!c.archived}
-                              onClick={() => categoryForm(c)}
+                            <HoverHint
+                              text={
+                                c.archived
+                                  ? msg(
+                                      "该分类已归档。请先点击“恢复”，再修改名称或分组。",
+                                    )
+                                  : msg(
+                                      "修改分类名称或分组；历史交易仍保留当时的分类版本。",
+                                    )
+                              }
                             >
-                              <Pencil size={14} />
-                              {msg("修改")}
-                            </button>
+                              <button
+                                disabled={!!c.archived}
+                                onClick={() => categoryForm(c)}
+                              >
+                                <Pencil size={14} />
+                                {msg("修改")}
+                              </button>
+                            </HoverHint>
                             <button
                               onClick={() =>
                                 act(() =>
@@ -3074,138 +3558,6 @@ export default function App() {
                   </section>
                 </>
               )}
-              {settingsTab === "allocations" && (
-                <section className="panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h3>{msg("工资分配计划")}</h3>
-                      <p>{msg("先记录工资，再从交易详情开启分配助手")}</p>
-                    </div>
-                    <button
-                      onClick={() =>
-                        goto("transactions", {
-                          kind: "INCOME",
-                          start: "1900-01-01",
-                          end: "2199-12-31",
-                        })
-                      }
-                    >
-                      {msg("选择工资收入")}
-                      <ArrowRight size={16} />
-                    </button>
-                  </div>
-                  {!data.plans.length && (
-                    <Empty
-                      title={msg("还没有分配计划")}
-                      hint={msg("工资到账后，补足消费预算，再安排剩余资金。")}
-                    />
-                  )}
-                  {data.plans.map((plan: Data) => (
-                    <div className="plan" key={plan.id}>
-                      <div className="plan-heading">
-                        <h3>
-                          {msg("工资分配 ·")}
-                          {new Date(plan.created_at).toLocaleDateString(
-                            getLocale(),
-                          )}
-                        </h3>
-                        <span className="tag neutral">
-                          {
-                            {
-                              DRAFT: msg("待执行"),
-                              PARTIAL: msg("部分完成"),
-                              COMPLETED: msg("已完成"),
-                              CANCELLED: msg("已取消"),
-                            }[plan.status as string]
-                          }
-                        </span>
-                        {["DRAFT", "PARTIAL"].includes(plan.status) && (
-                          <button
-                            onClick={() =>
-                              confirm(
-                                msg("取消剩余分配"),
-                                msg(
-                                  "已记录的真实转账保留，仅取消尚未完成的计划项。",
-                                ),
-                                async (_, op) =>
-                                  mutate(
-                                    "cancelAllocation",
-                                    { id: plan.id },
-                                    op,
-                                  ),
-                              )
-                            }
-                          >
-                            {msg("取消剩余")}
-                          </button>
-                        )}
-                      </div>
-                      {plan.items.map((i: Data) => (
-                        <div className="allocation-row" key={i.id}>
-                          <span>
-                            {
-                              data.accounts.find(
-                                (a: Data) => a.id === i.source_id,
-                              )?.name
-                            }{" "}
-                            <ArrowRight size={14} />{" "}
-                            {
-                              data.accounts.find(
-                                (a: Data) => a.id === i.destination_id,
-                              )?.name
-                            }
-                          </span>
-                          <strong>¥ {fmt(i.amount_minor)}</strong>
-                          {i.status === "PENDING" ? (
-                            <button
-                              onClick={() =>
-                                confirm(
-                                  msg("确认已完成转账"),
-                                  msg(
-                                    "请以银行实际转账为准；若已手动记账，请关联该交易ID。",
-                                  ),
-                                  async (p, op) =>
-                                    mutate(
-                                      "confirmAllocation",
-                                      {
-                                        id: i.id,
-                                        date: p.date,
-                                        transaction_id:
-                                          p.transaction_id || undefined,
-                                      },
-                                      op,
-                                    ),
-                                  [
-                                    {
-                                      name: "date",
-                                      label: msg("实际日期"),
-                                      type: "date",
-                                    },
-                                    {
-                                      name: "transaction_id",
-                                      label: msg("关联已有转账ID（可选）"),
-                                      required: false,
-                                    },
-                                  ],
-                                  { date: data.today },
-                                )
-                              }
-                            >
-                              {msg("记录 / 关联")}
-                            </button>
-                          ) : (
-                            <span className="muted">
-                              {i.status === "RECORDED"
-                                ? msg("已记录")
-                                : msg("已取消")}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </section>
-              )}
               {settingsTab === "data" && (
                 <>
                   <div className="data-cards">
@@ -3368,6 +3720,60 @@ export default function App() {
                       </button>
                     </div>
                   </section>
+                  <section className="panel spaced danger-zone">
+                    <div className="setting-row">
+                      <div>
+                        <h3>{msg("重新开始")}</h3>
+                        <p>
+                          {msg(
+                            "永久清空当前账本中的账户、交易、预算、待办、设置与修改历史，随后回到首次设置。",
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        className="danger-button"
+                        onClick={() =>
+                          confirm(
+                            msg("永久清空账本"),
+                            msg(
+                              "此操作无法撤销。请输入“重新开始”；如需彻底删除旧数据，请同时勾选删除应用管理的备份。",
+                            ),
+                            async (p) => {
+                              const phrase =
+                                getLocale() === "en"
+                                  ? "START OVER"
+                                  : "重新开始";
+                              if (p.confirm !== phrase)
+                                throw new Error(
+                                  msg("请输入“重新开始”确认清空账本"),
+                                );
+                              await api("resetLedger", {
+                                confirm: p.confirm,
+                                delete_backups: p.delete_backups === true,
+                              });
+                            },
+                            [
+                              {
+                                name: "confirm",
+                                label: msg("确认文字"),
+                                hint: msg("请输入：重新开始"),
+                              },
+                              {
+                                name: "delete_backups",
+                                label: msg("删除应用管理的本地备份"),
+                                type: "checkbox",
+                                required: false,
+                                hint: msg("勾选后将无法再用这些备份恢复旧账本"),
+                              },
+                            ],
+                          )
+                        }
+                      >
+                        <Trash2 size={16} />
+                        {msg("清空账本")}
+                      </button>
+                    </div>
+                  </section>
                   <section className="panel spaced">
                     <div className="panel-heading">
                       <h3>{msg("导入批次")}</h3>
@@ -3443,6 +3849,7 @@ function Onboarding({
   onRestore: () => void;
 }) {
   const [step, setStep] = useState(0),
+    [basis, setBasis] = useState("SALARY"),
     [payday, setPayday] = useState("10"),
     [start, setStart] = useState(new Date().toLocaleDateString("en-CA")),
     [blank, setBlank] = useState(false),
@@ -3450,6 +3857,13 @@ function Onboarding({
       { name: msg("日常消费"), opening: "0.00", roles: ["SPENDING"] },
       { name: msg("长期储蓄"), opening: "0.00", roles: ["SAVINGS"] },
       { name: msg("工资账户"), opening: "0.00", roles: ["SALARY"] },
+      {
+        name: msg("理财账户"),
+        opening: "0.00",
+        roles: ["SAVINGS"],
+        type_name: msg("投资/理财"),
+        valuation_mode: true,
+      },
     ]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -3532,16 +3946,33 @@ function Onboarding({
           {step === 0 && (
             <div className="setup-fields">
               <label>
-                {msg("每月工资日")}
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={payday}
-                  onChange={(e) => setPayday(e.target.value)}
-                />
-                <small>{msg("默认每月10日；短月自动取月底。")}</small>
+                {msg("预算周期口径")}
+                <select
+                  value={basis}
+                  onChange={(e) => setBasis(e.target.value)}
+                >
+                  <option value="SALARY">{msg("按工资周期")}</option>
+                  <option value="CALENDAR_MONTH">{msg("按自然月")}</option>
+                </select>
+                <small>
+                  {basis === "SALARY"
+                    ? msg("工资到账日作为每个预算周期的起点。")
+                    : msg("每个预算周期固定为自然月1日至月底。")}
+                </small>
               </label>
+              {basis === "SALARY" && (
+                <label>
+                  {msg("每月工资日")}
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={payday}
+                    onChange={(e) => setPayday(e.target.value)}
+                  />
+                  <small>{msg("默认每月10日；短月自动取月底。")}</small>
+                </label>
+              )}
               <label>
                 {msg("开始记账日期")}
                 <input
@@ -3580,6 +4011,10 @@ function Onboarding({
                       {msg("期初余额（元）")}
                       <input
                         aria-label={msg("期初余额") + (i + 1)}
+                        inputMode="decimal"
+                        title={msg(
+                          "可输入金额或使用 + - * / ( ) 计算，结果四舍五入到分",
+                        )}
                         value={a.opening}
                         onChange={(e) =>
                           setAccounts(
@@ -3705,9 +4140,10 @@ function Onboarding({
                 try {
                   if (step === 0) {
                     if (
-                      !Number.isInteger(Number(payday)) ||
-                      Number(payday) < 1 ||
-                      Number(payday) > 31
+                      basis === "SALARY" &&
+                      (!Number.isInteger(Number(payday)) ||
+                        Number(payday) < 1 ||
+                        Number(payday) > 31)
                     )
                       throw new Error(msg("工资日应为1—31"));
                     if (!start) throw new Error(msg("请选择开始日期"));
@@ -3718,7 +4154,10 @@ function Onboarding({
                     for (const a of accounts) {
                       if (!a.name.trim())
                         throw new Error(msg("请填写账户名称"));
-                      parseMoney(a.opening, { signed: true, zero: true });
+                      parseMoneyExpression(a.opening, {
+                        signed: true,
+                        zero: true,
+                      });
                     }
                   }
                   if (step < 2) setStep(step + 1);
@@ -3728,12 +4167,13 @@ function Onboarding({
                       action: "initialize",
                       operation_id: crypto.randomUUID(),
                       payload: {
-                        payday: Number(payday),
+                        basis,
+                        payday: basis === "SALARY" ? Number(payday) : 1,
                         start_date: start,
                         blank,
                         accounts: accounts.map((a) => ({
                           ...a,
-                          opening_minor: parseMoney(a.opening, {
+                          opening_minor: parseMoneyExpression(a.opening, {
                             signed: true,
                             zero: true,
                           }),
@@ -3789,6 +4229,11 @@ function BudgetEditor({
       !c.archived &&
       !items.some((x) => x.category_id === c.id),
   );
+  const addCategoryHint = available.length
+    ? msg("请先在左侧选择一个尚未加入预算的支出分类。")
+    : msg(
+        "现有可用支出分类已全部加入预算。要创建新分类，请前往“设置与数据 → 收支分类 → 新增分类”。",
+      );
   return (
     <div>
       <div className="budget-editor-list">
@@ -3797,7 +4242,7 @@ function BudgetEditor({
           return (
             <div className="budget-editor-row" key={x.category_id}>
               <input
-                aria-label={msg("启用") + c?.name}
+                aria-label={msg("启用") + localized(c?.name)}
                 type="checkbox"
                 checked={x.enabled}
                 onChange={(e) =>
@@ -3809,11 +4254,15 @@ function BudgetEditor({
                 }
               />
               <span>
-                <b>{c?.name}</b>
-                <small>{c?.group_name}</small>
+                <b>{localized(c?.name)}</b>
+                <small>{localized(c?.group_name)}</small>
               </span>
               <input
-                aria-label={c?.name + msg("预算")}
+                aria-label={localized(c?.name) + msg("预算")}
+                inputMode="decimal"
+                title={msg(
+                  "可输入金额或使用 + - * / ( ) 计算，结果四舍五入到分",
+                )}
                 value={x.amount}
                 onChange={(e) =>
                   setItems(
@@ -3829,34 +4278,41 @@ function BudgetEditor({
         })}
       </div>
       <div className="row-actions spaced">
-        <select value={add} onChange={(e) => setAdd(e.target.value)}>
+        <select
+          value={add}
+          aria-label={msg("选择新增预算分类")}
+          title={addCategoryHint}
+          onChange={(e) => setAdd(e.target.value)}
+        >
           <option value="">{msg("选择新增预算分类")}</option>
           {available.map((c: Data) => (
             <option key={c.id} value={c.id}>
-              {c.group_name} / {c.name}
+              {localized(c.group_name)} / {localized(c.name)}
             </option>
           ))}
         </select>
-        <button
-          disabled={!add}
-          onClick={() => {
-            const c = available.find((c: Data) => c.id === add);
-            setItems([
-              ...items,
-              {
-                category_id: c.id,
-                category_version_id: c.version_id,
-                amount: "0.00",
-                enabled: true,
-                note: "",
-              },
-            ]);
-            setAdd("");
-          }}
-        >
-          <Plus size={15} />
-          {msg("添加")}
-        </button>
+        <HoverHint text={addCategoryHint}>
+          <button
+            disabled={!add}
+            onClick={() => {
+              const c = available.find((c: Data) => c.id === add);
+              setItems([
+                ...items,
+                {
+                  category_id: c.id,
+                  category_version_id: c.version_id,
+                  amount: "0.00",
+                  enabled: true,
+                  note: "",
+                },
+              ]);
+              setAdd("");
+            }}
+          >
+            <Plus size={15} />
+            {msg("添加")}
+          </button>
+        </HoverHint>
       </div>
       <label className="spaced block">
         {msg("变更说明")}
@@ -3892,7 +4348,7 @@ function BudgetEditor({
                 expected_id: budget.id,
                 items: items.map((x) => ({
                   ...x,
-                  amount_minor: parseMoney(x.amount, { zero: true }),
+                  amount_minor: parseMoneyExpression(x.amount, { zero: true }),
                 })),
                 update_default: update,
                 reason,
@@ -3911,6 +4367,313 @@ function BudgetEditor({
     </div>
   );
 }
+function AllocationCenter({
+  data,
+  onAllocate,
+  onRecordSalary,
+  mutate,
+  ask,
+  format,
+}: {
+  data: Data;
+  onAllocate: (salary: Data) => void;
+  onRecordSalary: () => void;
+  mutate: (action: string, payload?: Data, op?: string) => Promise<any>;
+  ask: (
+    title: string,
+    description: string,
+    fn: (p: Data, op: string) => Promise<any>,
+    fields?: Field[],
+    initial?: Data,
+  ) => void;
+  format: (value: any, scope?: string, key?: string) => string;
+}) {
+  const accountName = (id: string) =>
+    data.accounts.find((a: Data) => a.id === id)?.name ?? msg("历史账户");
+  const status: Data = {
+    DRAFT: msg("待执行"),
+    PARTIAL: msg("部分完成"),
+    COMPLETED: msg("已完成"),
+    CANCELLED: msg("已取消"),
+  };
+  return (
+    <div className="allocation-center">
+      <section className="panel allocation-guide">
+        <div>
+          <span className="mini-icon green">
+            <Sparkles size={22} />
+          </span>
+          <div>
+            <h3>{msg("工资到账后的资金安排")}</h3>
+            <p>
+              {msg(
+                "依据本周期剩余预算和主要消费账户余额，先计算需要补入的生活资金，再把可分配余款安排到储蓄或理财账户。",
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="allocation-formula">
+          <span>{msg("剩余预算")}</span>
+          <ArrowRight size={15} />
+          <span>{msg("减去消费账户余额")}</span>
+          <ArrowRight size={15} />
+          <span>{msg("得到建议补足")}</span>
+          <ArrowRight size={15} />
+          <span>{msg("余款转入储蓄")}</span>
+        </div>
+        <p className="tip">
+          <CircleHelp size={16} />
+          {msg(
+            "薪流不会连接银行或执行真实转账。你在银行完成转账后，可逐项记录，或点击“我已完成银行转账，记录全部”。",
+          )}
+        </p>
+      </section>
+
+      <section className="panel spaced">
+        <div className="panel-heading">
+          <div>
+            <h3>{msg("选择本周期工资收入")}</h3>
+            <p>
+              {data.cycle.start} — {addDays(data.cycle.end, -1)}
+            </p>
+          </div>
+          <button className="primary" onClick={onRecordSalary}>
+            <Plus size={16} />
+            {msg("记录工资收入")}
+          </button>
+        </div>
+        <div className="salary-picker">
+          {data.salaryIncomes.map((salary: Data) => {
+            const existing = data.plans.find(
+              (plan: Data) => plan.salary_id === salary.id,
+            );
+            return (
+              <article key={salary.id}>
+                <div>
+                  <b>{salary.date}</b>
+                  <span>{salary.destination_name}</span>
+                </div>
+                <strong>¥ {format(salary.amount_minor)}</strong>
+                {existing ? (
+                  <span className="tag neutral">{status[existing.status]}</span>
+                ) : (
+                  <button onClick={() => onAllocate(salary)}>
+                    {msg("计算分配建议")}
+                    <ArrowRight size={15} />
+                  </button>
+                )}
+              </article>
+            );
+          })}
+        </div>
+        {!data.salaryIncomes.length && (
+          <Empty
+            title={msg("本周期还没有工资收入")}
+            hint={msg("记录收入时勾选“工资收入”，即可在这里生成分配方案。")}
+            action={
+              <button onClick={onRecordSalary}>{msg("记录工资收入")}</button>
+            }
+          />
+        )}
+      </section>
+
+      <section className="panel spaced">
+        <div className="panel-heading">
+          <div>
+            <h3>{msg("工资分配计划")}</h3>
+            <p>{msg("计划与实际内部转账分开保存，避免重复记账。")}</p>
+          </div>
+        </div>
+        {!data.plans.length && (
+          <Empty
+            title={msg("还没有分配计划")}
+            hint={msg("先从上方选择一笔工资收入。")}
+          />
+        )}
+        {data.plans.map((plan: Data) => {
+          const q = plan.data;
+          const pending = plan.items.filter(
+            (item: Data) => item.status === "PENDING",
+          );
+          return (
+            <div className="plan" key={plan.id}>
+              <div className="plan-heading">
+                <div>
+                  <h3>
+                    {msg("工资分配")} · {plan.salary?.date ?? ""}
+                  </h3>
+                  <p>
+                    {plan.salary?.destination_name} · ¥{" "}
+                    {format(plan.salary?.amount_minor ?? "0")}
+                  </p>
+                </div>
+                <span className="tag neutral">{status[plan.status]}</span>
+                {pending.length > 0 && (
+                  <HoverHint
+                    text={msg(
+                      "只在银行转账已经全部完成后使用；这里会批量记录内部转账，不会向银行发起转账。",
+                    )}
+                  >
+                    <button
+                      className="primary"
+                      onClick={() =>
+                        ask(
+                          msg("记录全部分配转账"),
+                          msg(
+                            "仅在你已经通过银行完成下列全部转账后确认。薪流会一次性创建对应内部转账记录。",
+                          ),
+                          async (p, op) =>
+                            mutate(
+                              "confirmAllocationPlan",
+                              { id: plan.id, date: p.date },
+                              op,
+                            ),
+                          [
+                            {
+                              name: "date",
+                              label: msg("实际转账日期"),
+                              type: "date",
+                            },
+                          ],
+                          { date: data.today },
+                        )
+                      }
+                    >
+                      <Check size={16} />
+                      {msg("我已完成银行转账，记录全部")}
+                    </button>
+                  </HoverHint>
+                )}
+              </div>
+              <div className="allocation-summary">
+                {[
+                  [msg("本周期预算"), q.total_budget],
+                  [msg("本周期净支出"), q.net_spent],
+                  [msg("剩余预算"), q.remaining_budget ?? q.target],
+                  [msg("当时消费账户余额"), q.spending_balance],
+                  [msg("分配上限"), q.cap],
+                  [msg("实际可分配"), q.available],
+                  [msg("建议补入消费账户"), q.topup],
+                  [msg("建议转入储蓄/理财"), q.saving],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <small>{label}</small>
+                    <strong>¥ {format(value ?? "0")}</strong>
+                  </div>
+                ))}
+              </div>
+              {plan.items.map((item: Data) => (
+                <div className="allocation-row" key={item.id}>
+                  <span>
+                    {accountName(item.source_id)}
+                    <ArrowRight size={14} />
+                    {accountName(item.destination_id)}
+                  </span>
+                  <strong>¥ {format(item.amount_minor)}</strong>
+                  {item.status === "PENDING" ? (
+                    <HoverHint
+                      text={msg(
+                        "银行转账已完成但尚未记账时选择记录；如果已经记过转账，则填写交易ID进行关联。",
+                      )}
+                    >
+                      <button
+                        onClick={() =>
+                          ask(
+                            msg("确认已完成转账"),
+                            msg(
+                              "请以银行实际转账为准；若已手动记账，可关联已有转账ID。",
+                            ),
+                            async (p, op) =>
+                              mutate(
+                                "confirmAllocation",
+                                {
+                                  id: item.id,
+                                  date: p.date,
+                                  transaction_id: p.transaction_id || undefined,
+                                },
+                                op,
+                              ),
+                            [
+                              {
+                                name: "date",
+                                label: msg("实际日期"),
+                                type: "date",
+                              },
+                              {
+                                name: "transaction_id",
+                                label: msg("关联已有转账ID（可选）"),
+                                required: false,
+                              },
+                            ],
+                            { date: data.today },
+                          )
+                        }
+                      >
+                        {msg("记录 / 关联")}
+                      </button>
+                    </HoverHint>
+                  ) : (
+                    <span className="muted">
+                      {item.status === "RECORDED"
+                        ? msg("已记录")
+                        : msg("已取消")}
+                    </span>
+                  )}
+                </div>
+              ))}
+              <div className="plan-actions">
+                {["DRAFT", "PARTIAL"].includes(plan.status) && (
+                  <HoverHint
+                    text={msg(
+                      "取消所有尚未完成的计划项；已经记录的真实转账不会撤销。",
+                    )}
+                  >
+                    <button
+                      onClick={() =>
+                        ask(
+                          msg("取消剩余分配"),
+                          msg("已记录的真实转账保留，仅取消尚未完成的计划项。"),
+                          async (_, op) =>
+                            mutate("cancelAllocation", { id: plan.id }, op),
+                        )
+                      }
+                    >
+                      {msg("取消剩余")}
+                    </button>
+                  </HoverHint>
+                )}
+                {plan.status === "CANCELLED" && (
+                  <HoverHint
+                    text={msg(
+                      "只把已取消计划从列表中隐藏；已经记录的转账仍保留在交易记录中。",
+                    )}
+                  >
+                    <button
+                      onClick={() =>
+                        ask(
+                          msg("删除已取消计划"),
+                          msg(
+                            "计划将从列表隐藏；已经记录的真实转账仍保留在交易记录中。",
+                          ),
+                          async (_, op) =>
+                            mutate("deleteAllocation", { id: plan.id }, op),
+                        )
+                      }
+                    >
+                      <Trash2 size={15} />
+                      {msg("删除计划")}
+                    </button>
+                  </HoverHint>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </section>
+    </div>
+  );
+}
+
 function Allocation({
   salary,
   data,
@@ -3922,87 +4685,217 @@ function Allocation({
 }) {
   const [quote, setQuote] = useState<Data | null>(null),
     [error, setError] = useState("");
+  const show = (value: any) =>
+    amountVisible(data.settings) ? money(value) : "••••";
+  const source = data.accounts.find(
+    (account: Data) => account.id === salary.destination_id,
+  );
+  const accountOptions = data.accounts
+    .filter((account: Data) => !account.archived)
+    .map((account: Data) => ({
+      value: account.id,
+      label:
+        account.name +
+        " · ¥ " +
+        show(account.balance) +
+        (account.valuation_mode ? " · " + msg("按估值管理") : ""),
+    }));
   return (
     <>
+      <div className="allocation-context">
+        <div>
+          <small>{msg("所选工资")}</small>
+          <strong>¥ {show(salary.amount_minor)}</strong>
+          <span>{salary.date}</span>
+        </div>
+        <div>
+          <small>{msg("工资到账账户")}</small>
+          <strong>{source?.name ?? msg("历史账户")}</strong>
+          <span>
+            {msg("当前余额")} ¥ {show(source?.balance ?? "0")}
+          </span>
+        </div>
+        <div>
+          <small>{msg("计算依据")}</small>
+          <strong>{msg("剩余预算优先")}</strong>
+          <span>{msg("先补消费账户，余款再安排储蓄")}</span>
+        </div>
+      </div>
+      <p className="tip allocation-tip">
+        <CircleHelp size={17} />
+        {msg(
+          "“本周期工资总额”会汇总本周期所有标记为工资的有效收入，并随各周期实际工资变化；“源账户当前余额”适合工资卡通常清零的用法；自定义金额由你输入。",
+        )}
+      </p>
       <Form
         fields={[
           {
             name: "spending_id",
-            label: msg("消费账户"),
+            label: msg("主要消费账户"),
             type: "select",
-            options: data.accounts
-              .filter((a: Data) => !a.archived)
-              .map((a: Data) => ({ value: a.id, label: a.name })),
+            options: accountOptions,
+            explain: msg(
+              "本周期剩余预算是计划；消费账户余额是真实资金。建议补足额＝剩余预算－消费账户余额，最低为0。",
+            ),
           },
           {
             name: "savings_id",
-            label: msg("储蓄账户（可留空）"),
+            label: msg("储蓄或理财账户（可留空）"),
             type: "select",
             required: false,
-            options: data.accounts
-              .filter((a: Data) => !a.archived)
-              .map((a: Data) => ({ value: a.id, label: a.name })),
+            options: accountOptions,
+            hint: msg("留空时，补足消费账户后的余款继续留在工资账户。"),
           },
-          { name: "reserve", label: msg("源账户保留（元）") },
-          { name: "cap", label: msg("本次分配上限（元）") },
+          {
+            name: "reserve",
+            type: "money",
+            label: msg("工资账户保留金额（元）"),
+            hint: msg("分配完成后希望仍留在工资账户的最低金额。"),
+          },
+          {
+            name: "limit_mode",
+            label: msg("分配上限口径"),
+            type: "select",
+            options: [
+              {
+                value: "CYCLE_SALARY",
+                label: msg("本周期工资总额"),
+              },
+              {
+                value: "SOURCE_BALANCE",
+                label: msg("源账户当前余额"),
+              },
+              {
+                value: "CUSTOM",
+                label: msg("其他金额（手动输入）"),
+              },
+            ],
+          },
+          {
+            name: "cap",
+            type: "money",
+            label: msg("自定义分配上限（元）"),
+            visible: (values) => values.limit_mode === "CUSTOM",
+          },
         ]}
         initial={{
           spending_id: data.settings.defaults.SPENDING,
           savings_id: data.settings.defaults.SAVINGS,
           reserve: "0.00",
+          limit_mode: "CYCLE_SALARY",
           cap: decimal(salary.amount_minor),
         }}
         submit={msg("计算分配建议")}
-        onSubmit={async (p) => {
+        onSubmit={async (values) => {
+          setError("");
           setQuote(
             await api("allocationQuote", {
-              ...p,
+              ...values,
               salary_id: salary.id,
-              reserve_minor: parseMoney(p.reserve, { zero: true }),
-              cap_minor: parseMoney(p.cap, { zero: true }),
+              reserve_minor: parseMoneyExpression(values.reserve, {
+                zero: true,
+              }),
+              cap_minor:
+                values.limit_mode === "CUSTOM"
+                  ? parseMoneyExpression(values.cap, { zero: true })
+                  : undefined,
             }),
           );
         }}
       />
       {quote && (
         <div className="quote">
-          <h3>{msg("分配建议")}</h3>
-          <dl>
-            <dt>{msg("消费资金目标")}</dt>
-            <dd>¥ {money(quote.target)}</dd>
-            <dt>{msg("建议补足")}</dt>
-            <dd>¥ {money(quote.topup)}</dd>
-            <dt>{msg("剩余可储蓄")}</dt>
-            <dd>¥ {money(quote.saving)}</dd>
-            <dt>{msg("资金缺口")}</dt>
-            <dd>¥ {money(quote.shortage)}</dd>
-          </dl>
+          <div className="quote-heading">
+            <div>
+              <h3>{msg("分配建议")}</h3>
+              <p>
+                {quote.cycle_start} — {addDays(quote.cycle_end, -1)}
+              </p>
+            </div>
+            <span className="tag neutral">
+              {
+                {
+                  CYCLE_SALARY: msg("上限：本周期工资总额"),
+                  SOURCE_BALANCE: msg("上限：源账户当前余额"),
+                  CUSTOM: msg("上限：用户输入"),
+                }[quote.limit_mode as string]
+              }
+            </span>
+          </div>
+          <div className="quote-calculation">
+            {[
+              [msg("本周期预算"), quote.total_budget],
+              [msg("本周期净支出"), quote.net_spent],
+              [msg("本周期剩余预算"), quote.remaining_budget],
+              [msg("消费账户当前余额"), quote.spending_balance],
+              [msg("需要补足消费账户"), quote.needed],
+              [msg("本周期工资总额"), quote.cycle_salary],
+              [msg("源账户当前余额"), quote.source_balance],
+              [msg("工资账户保留"), quote.reserve],
+              [msg("所选分配上限"), quote.cap],
+              [msg("扣除已分配后可用"), quote.available],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <small>{label}</small>
+                <strong>¥ {show(value)}</strong>
+              </div>
+            ))}
+          </div>
+          <div className="quote-result">
+            <div>
+              <small>{msg("建议转入消费账户")}</small>
+              <strong>¥ {show(quote.topup)}</strong>
+              <span>
+                {quote.source_name} → {quote.spending_name}
+              </span>
+            </div>
+            <div>
+              <small>{msg("建议转入储蓄/理财")}</small>
+              <strong>¥ {show(quote.saving)}</strong>
+              <span>
+                {quote.savings_name
+                  ? quote.source_name + " → " + quote.savings_name
+                  : msg("未选择账户，余款留在工资账户")}
+              </span>
+            </div>
+            <div>
+              <small>{msg("尚未补足的预算资金")}</small>
+              <strong>¥ {show(quote.shortage)}</strong>
+              <span>{msg("上限或源账户余额不足时才会出现")}</span>
+            </div>
+          </div>
           <p className="muted">
             {msg(
-              "保存计划不会移动资金。实际转账后，到“设置与数据 → 工资分配”确认记录。",
+              "保存只生成计划，不会操作银行。实际完成转账后，到“工资分配”页逐项记录或一次记录全部。",
             )}
           </p>
           {error && <p className="error">{error}</p>}
-          <button
-            className="primary"
-            onClick={async () => {
-              try {
-                await api("command", {
-                  action: "saveAllocation",
-                  payload: {
-                    ...quote.input,
-                    expected_revision: quote.revision,
-                  },
-                  operation_id: crypto.randomUUID(),
-                });
-                await onDone();
-              } catch (e: any) {
-                setError(msg(e.message));
-              }
-            }}
+          <HoverHint
+            text={msg(
+              "只保存这份分配建议，不会发起银行转账，也不会立即生成交易记录。",
+            )}
           >
-            {msg("保存分配计划")}
-          </button>
+            <button
+              className="primary"
+              onClick={async () => {
+                try {
+                  await api("command", {
+                    action: "saveAllocation",
+                    payload: {
+                      ...quote.input,
+                      expected_revision: quote.revision,
+                    },
+                    operation_id: crypto.randomUUID(),
+                  });
+                  await onDone();
+                } catch (e: any) {
+                  setError(msg(e.message));
+                }
+              }}
+            >
+              {msg("保存分配计划")}
+            </button>
+          </HoverHint>
         </div>
       )}
     </>
@@ -4089,20 +4982,30 @@ function ImportPreview({
             {preview.rows.map((r: Data, i: number) => (
               <tr key={i}>
                 <td>
-                  <input
-                    aria-label={msg("导入第") + r.line + msg("行")}
-                    disabled={!!r.error}
-                    type="checkbox"
-                    checked={!r.skip && !r.error}
-                    onChange={(e) =>
-                      setPreview({
-                        ...preview,
-                        rows: preview.rows.map((x: Data, n: number) =>
-                          n === i ? { ...x, skip: !e.target.checked } : x,
-                        ),
-                      })
+                  <HoverHint
+                    text={
+                      r.error
+                        ? msg(
+                            "该行存在错误，不能导入。请根据右侧原因修正源文件后重新选择。",
+                          )
+                        : msg("勾选决定这一行是否随本批次导入。")
                     }
-                  />
+                  >
+                    <input
+                      aria-label={msg("导入第") + r.line + msg("行")}
+                      disabled={!!r.error}
+                      type="checkbox"
+                      checked={!r.skip && !r.error}
+                      onChange={(e) =>
+                        setPreview({
+                          ...preview,
+                          rows: preview.rows.map((x: Data, n: number) =>
+                            n === i ? { ...x, skip: !e.target.checked } : x,
+                          ),
+                        })
+                      }
+                    />
+                  </HoverHint>
                 </td>
                 <td>{r.line}</td>
                 <td>{r.date || "—"}</td>

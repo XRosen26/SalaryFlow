@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Store, json } from "../core/store.mjs";
 import { currentSchema } from "../core/migrations.mjs";
 import { previewCSV, exportCSV, headers, escapeCell } from "../core/csv.mjs";
-import { readLocation, relocate } from "../core/storage.mjs";
+import { readLocation, relocate, resetLedgerFiles } from "../core/storage.mjs";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const defaultDirectory = path.join(app.getPath("appData"), "SalaryFlow");
 if (process.env.SALARYFLOW_DATA_DIR)
@@ -108,6 +108,42 @@ async function request(method, p) {
   if (method === "clearCache") {
     await win.webContents.session.clearCache();
     return { ok: true };
+  }
+  if (method === "resetLedger") {
+    const resetPhrase =
+      store.settings().locale === "en" ? "START OVER" : "重新开始";
+    if (p.confirm !== resetPhrase)
+      throw new Error("请输入“重新开始”确认清空账本");
+    const answer = await dialog.showMessageBox(win, {
+      type: "warning",
+      title: ui("重新开始"),
+      message: ui("当前账本中的账户、交易、预算和设置将被永久删除。"),
+      detail: p.delete_backups
+        ? ui("应用管理的本地备份也会一并删除，操作无法撤销。")
+        : ui("应用管理的本地备份将保留，可用于恢复。"),
+      buttons: [ui("取消"), ui("永久清空")],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (answer.response !== 1) return null;
+    const directory = backupDir();
+    const ledger = path.join(dataDir, "ledger.sqlite");
+    store.close();
+    store = null;
+    try {
+      const result = resetLedgerFiles(
+        dataDir,
+        directory,
+        p.delete_backups === true,
+      );
+      store = new Store(ledger);
+      setTimeout(() => win.reload(), 250);
+      return result;
+    } catch (error) {
+      if (!store) store = new Store(ledger);
+      throw error;
+    }
   }
   if (method === "chooseDataDirectory") {
     const picked = await dialog.showOpenDialog(win, {

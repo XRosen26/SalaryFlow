@@ -14,6 +14,11 @@ store.command("initialize", {
       opening_minor: "123456",
       roles: ["SALARY", "SPENDING"],
     },
+    {
+      name: "日常消费",
+      opening_minor: "0",
+      roles: ["SAVINGS"],
+    },
   ],
 });
 store.close();
@@ -51,6 +56,7 @@ try {
     "Overview",
     "Transactions",
     "Budgets & cycles",
+    "Salary allocation",
     "Accounts",
     "Analytics",
     "Settings & data",
@@ -62,6 +68,12 @@ try {
         .count(),
       1,
     );
+  await page
+    .locator("nav")
+    .getByRole("button", { name: "Accounts", exact: true })
+    .click();
+  await page.getByText("Everyday spending", { exact: true }).waitFor();
+  assert.equal(await page.getByText("日常消费", { exact: true }).count(), 0);
   await page
     .locator("nav")
     .getByRole("button", { name: "Overview", exact: true })
@@ -101,6 +113,7 @@ try {
   );
   assert.equal(english.data.totalAssets, initial.data.totalAssets);
   assert.equal(english.data.accounts[0].name, "我的银行卡");
+  assert.equal(english.data.accounts[1].name, "日常消费");
   assert.deepEqual(english.data.categories, initial.data.categories);
   await page
     .locator("nav")
@@ -120,7 +133,8 @@ try {
         checks: [
           "默认中文",
           "设置中切换English",
-          "六个导航标签英文",
+          "七个导航标签英文",
+          "预置账户名按界面语言显示且不改写账本",
           "英文金额校验错误",
           "切回中文",
           "账户名称与分类保持原文",

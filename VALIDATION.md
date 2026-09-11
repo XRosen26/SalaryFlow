@@ -1,4 +1,38 @@
-# 验证记录 · 0.2.0
+# 验证记录 · 0.6.2
+
+## 0.6.2金额计算、完整说明与双语显示验收 · 2026-09-12
+
+55项Node自动化测试通过，0失败；TypeScript/Vite生产构建、源码Electron桌面流程、0.6.2包内EXE桌面流程和包内中文/English切换均通过。新增覆盖四则运算、括号、运算优先级、除零/非法字符、普通金额两位小数约束、最终按分四舍五入，以及预置账户名称只在显示层翻译而不改写账本。
+
+实际桌面流程在金额框输入 `20+15.50`，界面预览并保存为¥35.50的一笔交易。个人默认预算的禁用“添加”说明和总览“当前可安心支出”说明均通过可见性与窗口坐标断言，气泡四边没有超出窗口；截图为 `test-results/10-budget-category-hint.png` 和 `test-results/11-safe-spend-tooltip.png`。
+
+包内19个应用代码与资源文件和当前构建逐字节SHA-256一致，版本、产品名、入口等元数据一致；详细记录见 `test-results/release-0.6.2.json`。安装版SHA-256为 `adafe42e3bb1c701d0f80fd6db14ebdebfc54f14c375a484a554fce4665fc3db`，免安装版为 `a02eab6effe813e1d8096c6a754edaafb50602ff1a6cc59d4f870c24b2bd12f4`，两者Authenticode状态均为NotSigned。
+
+所有桌面测试使用 `.local` 下的隔离账本；打包清单不包含SQLite、备份或用户数据。数据库schema保持4。
+
+## 0.6.1操作说明验收 · 2026-09-11
+
+51项Node自动化测试通过，0失败；TypeScript/Vite生产构建、源码Electron桌面流程和0.6.1包内EXE桌面流程全部通过。中英文静态文本完整，数据库schema保持4。
+
+桌面测试实际打开个人默认预算，确认全部支出分类已加入时“添加”按钮禁用；鼠标悬停后显示原因和“设置与数据 → 收支分类 → 新增分类”路径。气泡状态、辅助属性及截图`test-results/10-budget-category-hint.png`均已核对。已结算预算、分页、账户排序、归档分类、导入错误行及关键财务操作复用同一说明组件。
+
+包内18个应用代码与资源文件和当前构建逐字节SHA-256一致；详细记录见`test-results/release-0.6.1.json`，成品校验值见`release/SHA256SUMS-0.6.1.txt`。两个发布文件Authenticode状态均为NotSigned。测试使用隔离账本，没有读取或打包用户个人账本；本轮没有提交或推送GitHub。
+
+## 0.6.0周期口径、工资分配与理财估值验收 · 2026-09-11
+
+51项Node自动化测试通过，0失败；TypeScript/Vite生产构建、源码Electron桌面流程和0.6.0包内EXE桌面流程全部通过。新增覆盖账户页总资产独立隐藏、全局与局部金额显示AND规则、工资周期/自然月口径、立即/下周期/指定日期生效、理财估值、同日流水顺序、预算与消费账户可安心支出、工资分配三种上限、批量确认、取消及删除。
+
+包内18个应用代码与资源文件和当前构建逐字节SHA-256一致；包内name、productName、version、main元数据一致。详细记录见`test-results/release-0.6.0.json`，安装版与免安装版校验值见`release/SHA256SUMS-0.6.0.txt`。两个发布文件的Authenticode状态均为NotSigned。
+
+测试使用隔离账本，没有读取、复制或打包用户个人账本。应用数据和备份不属于electron-builder的打包文件清单。本轮没有提交或推送GitHub。
+
+## 0.5.0金额隐私、工资日与账本重置验收 · 2026-09-11
+
+46项Node自动化测试通过，0失败；生产构建与Electron隔离账本桌面测试通过，0.5.0包内程序再次通过同一桌面流程。新增覆盖全局与局部金额显示AND规则、局部偏好、工资日立即/7天后生效、周期连续、清空账本限定文件及备份选择。
+
+包内14个核心文件与当前源码SHA-256一致，已发布schema/migration未改。安装版与免安装版及校验值见test-results/release-0.5.0.json和release/SHA256SUMS-0.5.0.txt；发布者签名状态为NotSigned。本轮未提交或推送GitHub。
+
+按用户明确要求，默认数据目录中的当前ledger.sqlite、WAL/SHM、备份状态及应用命名的本地账本备份已清除；清除后主库不存在、应用管理备份为0，下次启动进入全新账本流程。
 
 ## 0.4.0图表与配色验收 · 2026-09-07
 
@@ -22,15 +56,15 @@ scripts/iteration03-desktop.mjs已通过实际UI操作：连续新增两个账�
 
 日期：2026-09-06。本机 Windows x64；测试账本与真实用户数据隔离。
 
-| 项目 | 实际结果与证据 |
-|---|---|
-| TypeScript / Vite生产构建 | 通过 |
-| Node自动化 | 30项通过，0失败；tests/core.test.mjs、reliability.test.mjs、localization.test.mjs |
-| 金额与可靠性 | 整数金额、转账守恒、退款上限和跨期、历史修改、三层预算、结算重新打开、校准、分类版本、账单、分配、CSV去重、备份恢复、迁移、中断恢复及随机序列 |
-| 中文桌面 | 首次配置、实际表单记支出、六页导航、账单弹层、深浅模式、1100像素窗口、余额断言；scripts/desktop-test.mjs |
-| 双语桌面 | 默认中文、切English、六项导航英文、英文校验错误、切回中文、账户与分类原文不变、总资产不变；scripts/language-test.mjs |
-| 100,000笔交易/20账户 | 六次查询313—336ms；test-results/performance-optimized.json；仅为本机数据 |
-| 中文MVP检查点 | 0.1.0两种包已生成，包内程序测试通过；test-results/mvp-packaged-report.json及mvp-artifacts.json |
+| 项目                      | 实际结果与证据                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| TypeScript / Vite生产构建 | 通过                                                                                                                                          |
+| Node自动化                | 30项通过，0失败；tests/core.test.mjs、reliability.test.mjs、localization.test.mjs                                                             |
+| 金额与可靠性              | 整数金额、转账守恒、退款上限和跨期、历史修改、三层预算、结算重新打开、校准、分类版本、账单、分配、CSV去重、备份恢复、迁移、中断恢复及随机序列 |
+| 中文桌面                  | 首次配置、实际表单记支出、六页导航、账单弹层、深浅模式、1100像素窗口、余额断言；scripts/desktop-test.mjs                                      |
+| 双语桌面                  | 默认中文、切English、六项导航英文、英文校验错误、切回中文、账户与分类原文不变、总资产不变；scripts/language-test.mjs                          |
+| 100,000笔交易/20账户      | 六次查询313—336ms；test-results/performance-optimized.json；仅为本机数据                                                                      |
+| 中文MVP检查点             | 0.1.0两种包已生成，包内程序测试通过；test-results/mvp-packaged-report.json及mvp-artifacts.json                                                |
 
 最终0.2.0打包检查结果写入 `test-results/final-release.json`；桌面与语言测试报告分别为 `test-results/desktop-report.json`、`test-results/language-report.json`。发布前核对 ASAR 内源码、主进程及构建资源与当前文件一致，再对包内 EXE 运行这两套桌面测试。截图位于 `test-results/01-onboarding.png` 至 `10-overview-english.png`（为隔离测试账本）。
 

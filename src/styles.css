@@ -526,6 +526,28 @@ h2,
   font-size: 10px;
   color: #b5cdbf;
 }
+.budget-reality {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 15px 0 4px;
+  padding: 11px 0;
+  border-top: 1px solid #ffffff20;
+  border-bottom: 1px solid #ffffff20;
+}
+.budget-reality span,
+.budget-reality small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.budget-reality span {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.budget-reality strong {
+  font-size: 13px;
+}
 .hero-bottom {
   display: flex;
   gap: 29px;
@@ -1005,6 +1027,11 @@ h2,
   display: block;
   color: var(--muted);
   font-size: 11px;
+}
+.asset-total-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .asset-total strong {
   font-size: 28px;
@@ -1952,6 +1979,28 @@ dd {
   .summary-card h2 {
     font-size: 23px;
   }
+  .budget-reality {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 15px 0 4px;
+    padding: 11px 0;
+    border-top: 1px solid #ffffff20;
+    border-bottom: 1px solid #ffffff20;
+  }
+  .budget-reality span,
+  .budget-reality small {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .budget-reality span {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .budget-reality strong {
+    font-size: 13px;
+  }
   .hero-bottom {
     gap: 18px;
   }
@@ -2093,13 +2142,53 @@ dd {
   text-align: center;
   font-size: 9px;
 }
-.help-tip {
+.help-tip,
+.hover-hint {
+  position: relative;
   display: inline-flex;
+  align-items: center;
+}
+.help-tip {
   margin-left: 6px;
   cursor: help;
   vertical-align: middle;
   color: var(--muted);
 }
+.hover-hint {
+  max-width: 100%;
+}
+.tooltip-portal {
+  position: fixed;
+  z-index: 5000;
+  width: max-content;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--text);
+  color: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+}
+.tooltip-portal.above {
+  transform: translate(-50%, -100%);
+}
+.tooltip-portal.below {
+  transform: translate(-50%, 0);
+}
+.money-expression-result {
+  display: block;
+  color: var(--positive);
+  font-variant-numeric: tabular-nums;
+}
+.money-expression-result.error {
+  color: var(--danger);
+}
+
 .quick-presets {
   display: flex;
   flex-wrap: wrap;
@@ -2357,4 +2446,200 @@ html[lang="en"] .brand strong {
 }
 :root[data-palette] .sidebar nav button.selected {
   color: var(--accent);
+}
+
+.card-head-actions,
+.account-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.card-amount-toggle {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+.card-amount-toggle:hover {
+  color: var(--accent);
+  background: var(--soft);
+}
+.hero-card .card-amount-toggle {
+  color: white;
+  background: #ffffff14;
+  border-color: #ffffff18;
+}
+.metric-label > .card-amount-toggle {
+  margin-left: auto;
+}
+.account-card-top > .account-head-actions {
+  margin-left: auto;
+}
+.danger-zone {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.danger-zone h3 {
+  color: var(--danger);
+}
+button.danger-button {
+  color: white;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+button.danger-button:hover {
+  filter: brightness(0.92);
+}
+
+.allocation-center {
+  display: grid;
+  gap: 22px;
+}
+.allocation-guide {
+  padding: 24px;
+}
+.allocation-guide > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.allocation-guide > div:first-child p,
+.plan-heading p {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.allocation-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 0;
+}
+.allocation-formula span {
+  background: var(--soft);
+  border-radius: 7px;
+  padding: 8px 11px;
+  font-size: 11px;
+}
+.allocation-guide .tip {
+  margin: 20px 0 0;
+}
+.salary-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 0 23px 23px;
+}
+.salary-picker article {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 15px;
+}
+.salary-picker article span {
+  color: var(--muted);
+  font-size: 10px;
+  display: block;
+  margin-top: 4px;
+}
+.allocation-summary,
+.quote-calculation,
+.allocation-context {
+  display: grid;
+  gap: 10px;
+}
+.allocation-summary {
+  grid-template-columns: repeat(4, 1fr);
+  margin: 14px 0;
+}
+.allocation-summary > div,
+.quote-calculation > div,
+.allocation-context > div {
+  background: var(--soft);
+  border-radius: 7px;
+  padding: 12px;
+}
+.allocation-summary small,
+.allocation-summary strong,
+.quote-calculation small,
+.quote-calculation strong,
+.allocation-context small,
+.allocation-context strong,
+.allocation-context span,
+.quote-result small,
+.quote-result strong,
+.quote-result span {
+  display: block;
+}
+.allocation-summary small,
+.quote-calculation small,
+.allocation-context small,
+.quote-result small {
+  color: var(--muted);
+  font-size: 10px;
+  margin-bottom: 7px;
+}
+.allocation-context {
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 18px;
+}
+.allocation-context span,
+.quote-result span {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 6px;
+}
+.allocation-tip {
+  margin: 0 0 20px;
+}
+.quote-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.quote-heading p {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 5px;
+}
+.quote-calculation {
+  grid-template-columns: repeat(5, 1fr);
+}
+.quote-result {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
+.quote-result > div {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.quote-result strong {
+  font-size: 18px;
+}
+.plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+@media (max-width: 1200px) {
+  .allocation-summary,
+  .quote-calculation {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .allocation-context,
+  .quote-result {
+    grid-template-columns: 1fr;
+  }
 }

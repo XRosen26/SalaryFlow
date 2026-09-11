@@ -16,3 +16,4 @@ test-results/
 backup-status.json
 location.json
 SalaryFlow-data/
+.cache/

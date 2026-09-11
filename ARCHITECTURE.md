@@ -1,5 +1,7 @@
 # 薪流 SalaryFlow · 技术、数据库与验证设计
 
+0.5增量：settings JSON增加amount_visibility，包含master、overview三卡和动态account id映射，兼容旧hide_amounts；显示判定不参与金额计算。setPayday以IMMEDIATE/NEXT_WEEK显式模式更新开放周期和cycle_rules，事务内验证交易范围及结算快照。resetLedger在主进程原生二次确认后关闭SQLite，限定路径删除主库/WAL/SHM和可选的SalaryFlow命名备份，再创建空账本并重载；schema保持3。
+
 0.4增量：core/charts.mjs用BigInt完成日期分组与饼图合计，src/Charts.tsx负责本地SVG图表及交互；仅坐标/比例映射使用Number，财务金额标签由整数分字符串格式化。settings JSON增加palette（六值白名单），不更改schema或既有迁移。视图配色不参与财务计算。
 
 ## 0.3实现增量（2026-09-07）
@@ -8,17 +10,17 @@ schema仍为3，不改已发布SQL。余额保护和自定义分类创建在主�
 
 core/storage.mjs负责位置配置与迁移：父目录下创建SalaryFlow-data，Online Backup生成快照、验证后以排他创建方式复制ledger.sqlite，保留备份，再原子提交默认用户目录的location.json。重启后切换userData；原账本保留，不覆盖已有目标库。自选磁盘不可用时停止启动，不自动新建空账本。默认用户目录保留小型路径配置文件，应用缓存位于当前userData。清理缓存调用Electron session.clearCache，不删除账本或审计。
 
-版本：V1 已确认架构基线｜2026-09-06｜应用0.3.0已实现。实际采用Electron备选、Node SQLite、数据库schema 3；真实DDL与设计差异见 [IMPLEMENTATION.md](./IMPLEMENTATION.md)。下文候选模型保留用于设计追溯，不代表所有P1/P2表已实现。
+版本：V1 已确认架构基线｜2026-09-06｜应用0.6.2已实现。实际采用Electron备选、Node SQLite、数据库schema 4；真实DDL与设计差异见 [IMPLEMENTATION.md](./IMPLEMENTATION.md)。下文候选模型保留用于设计追溯，不代表所有P1/P2表已实现。
 
 业务定义以 [PRD.md](./PRD.md) BR01—BR13 为准；页面见 [PRODUCT_DESIGN.md](./PRODUCT_DESIGN.md)。D20 技术选型、D02 范围及其他业务决策确认后才能冻结本模型。下文是可评审的数据字典与约束设计，不是已执行的 migration。
 
 ## 1. 技术路线与取舍
 
-| 路线 | 优点（架构判断） | 代价 | 建议 |
-|---|---|---|---|
+| 路线                              | 优点（架构判断）                                               | 代价                                                     | 建议                                       |
+| --------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------ |
 | Tauri 2 + React/TypeScript + Rust | 适合本地应用，将账务与文件权限集中在Rust端，Web UI可做清晰表格 | TS/Rust两套工程；Windows依赖WebView2，桌面测试需专门链路 | 候选首选，先验证最小打包/数据库/恢复纵切片 |
-| Electron + React/TypeScript | 若维护者只熟悉TS，可减少语言切换 | 自带运行时，需管理进程隔离、IPC与原生SQLite模块打包 | 明确的备选，不在确认前同时搭两套正式工程 |
-| .NET/WPF + Microsoft.Data.Sqlite | 适合Windows专用和C#维护者，原生桌面集成直接 | UI与前述Web方案不共享，设计实现路径不同 | 若用户已有C#经验可改选，开发前确认 |
+| Electron + React/TypeScript       | 若维护者只熟悉TS，可减少语言切换                               | 自带运行时，需管理进程隔离、IPC与原生SQLite模块打包      | 明确的备选，不在确认前同时搭两套正式工程   |
+| .NET/WPF + Microsoft.Data.Sqlite  | 适合Windows专用和C#维护者，原生桌面集成直接                    | UI与前述Web方案不共享，设计实现路径不同                  | 若用户已有C#经验可改选，开发前确认         |
 
 推荐是对本项目的工程判断，不是官方性能排名；尚未测量包体、内存或启动速度。Tauri官方说明Windows安装器可选NSIS的exe或WiX的msi，WebView2有下载及离线部署方式；因此“应用离线使用”与“首次完全离线安装”需分别确认。[Tauri Windows安装说明](https://v2.tauri.app/distribute/windows-installer/)
 
@@ -26,20 +28,20 @@ Electron备选必须关闭渲染层Node集成、启用上下文隔离并校验IP
 
 ### 候选组件
 
-| 领域 | 方案与边界 |
-|---|---|
-| UI | React + TypeScript + Vite；本地打包静态资源；CSS变量主题和可访问基础控件；无远程CDN依赖 |
-| 核心账务 | Rust领域服务，Money/LocalDate/DateRange/TransactionKind类型；前端不能自行推导最终余额 |
-| SQLite | rusqlite，固定构建中的SQLite版本；bundled及backup能力在纵切片验证；参数化SQL，手写版本化migration |
-| 状态 | TanStack Query管理通过IPC读取的数据缓存；React局部状态管理表单/导航/主题；P0不再引入第二个全局业务状态库 |
-| 图表 | Apache ECharts，按需图形；精确金额来自同一查询结果；图表浮点坐标仅用于绘图，不回写账务 |
-| 导入 | Rust CSV解析和显式字段映射；统一规范化与预检；平台账单适配器P1 |
-| CSV/JSON | Rust csv与serde_json候选；金额输出规则独立于库，JSON分单位字符串；开发时锁定版本 |
-| XLSX（P1） | rust_xlsxwriter，金额/文本明确写类型，工作表来自统一报表DTO |
-| Markdown（P1） | 本地模板生成周期复盘，转义表格分隔符与用户文本；不依赖大模型 |
-| 自动备份 | Rust后台任务调用SQLite在线备份，应用启动/日间变更/危险操作前触发；非Windows常驻服务 |
-| 打包 | Windows x64 NSIS候选；数据目录独立；Win11验收，其他版本与架构按D20确定 |
-| 测试 | Rust单元/属性/真实SQLite集成；Vitest + Testing Library候选；Windows桌面E2E用tauri-driver + WebdriverIO候选 |
+| 领域           | 方案与边界                                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| UI             | React + TypeScript + Vite；本地打包静态资源；CSS变量主题和可访问基础控件；无远程CDN依赖                    |
+| 核心账务       | Rust领域服务，Money/LocalDate/DateRange/TransactionKind类型；前端不能自行推导最终余额                      |
+| SQLite         | rusqlite，固定构建中的SQLite版本；bundled及backup能力在纵切片验证；参数化SQL，手写版本化migration          |
+| 状态           | TanStack Query管理通过IPC读取的数据缓存；React局部状态管理表单/导航/主题；P0不再引入第二个全局业务状态库   |
+| 图表           | Apache ECharts，按需图形；精确金额来自同一查询结果；图表浮点坐标仅用于绘图，不回写账务                     |
+| 导入           | Rust CSV解析和显式字段映射；统一规范化与预检；平台账单适配器P1                                             |
+| CSV/JSON       | Rust csv与serde_json候选；金额输出规则独立于库，JSON分单位字符串；开发时锁定版本                           |
+| XLSX（P1）     | rust_xlsxwriter，金额/文本明确写类型，工作表来自统一报表DTO                                                |
+| Markdown（P1） | 本地模板生成周期复盘，转义表格分隔符与用户文本；不依赖大模型                                               |
+| 自动备份       | Rust后台任务调用SQLite在线备份，应用启动/日间变更/危险操作前触发；非Windows常驻服务                        |
+| 打包           | Windows x64 NSIS候选；数据目录独立；Win11验收，其他版本与架构按D20确定                                     |
+| 测试           | Rust单元/属性/真实SQLite集成；Vitest + Testing Library候选；Windows桌面E2E用tauri-driver + WebdriverIO候选 |
 
 rusqlite提供Rust SQLite接口与可选备份模块。[rusqlite官方API](https://docs.rs/rusqlite/latest/rusqlite/) TanStack Query用于缓存、失效与异步数据生命周期，本项目将IPC视作数据访问函数，而不是引入网络服务器。[TanStack Query概览](https://tanstack.com/query/latest/docs/framework/react/overview) ECharts提供图表构建能力。[ECharts官方入门](https://echarts.apache.org/handbook/en/get-started/) XLSX候选库的写入能力以其官方API为准。[rust_xlsxwriter文档](https://docs.rs/rust_xlsxwriter/latest/rust_xlsxwriter/)
 
@@ -73,15 +75,15 @@ flowchart TD
 
 SQLite INTEGER可存有符号64位整数；SQLite默认类型亲和性不等于强类型保证。本项目财务表建议STRICT，并对整数、枚举、日期和关联类型增加约束。[SQLite数据类型](https://www.sqlite.org/datatype3.html)
 
-| 记号 | 存储定义 |
-|---|---|
-| ID | TEXT，不可变UUID，由应用生成；PK均NOT NULL；不能用名称作为主键 |
+| 记号  | 存储定义                                                                           |
+| ----- | ---------------------------------------------------------------------------------- |
+| ID    | TEXT，不可变UUID，由应用生成；PK均NOT NULL；不能用名称作为主键                     |
 | MONEY | INTEGER，单位分；普通正金额、预算非负、期初/校准允许有符号；不使用REAL/浮点DECIMAL |
-| DATE | TEXT，严格YYYY-MM-DD本地日历日，应用校验实际有效日期和固定宽度，支持字典序索引 |
-| TS | TEXT，固定格式UTC时间戳；只作审计与操作顺序，不替代DATE做周期归属 |
-| BOOL | INTEGER，CHECK IN(0,1) |
-| JSON | TEXT，CHECK json_valid；跨语言金额值以十进制分字符串表达 |
-| REV | INTEGER正数，乐观锁版本；不是schema_version |
+| DATE  | TEXT，严格YYYY-MM-DD本地日历日，应用校验实际有效日期和固定宽度，支持字典序索引     |
+| TS    | TEXT，固定格式UTC时间戳；只作审计与操作顺序，不替代DATE做周期归属                  |
+| BOOL  | INTEGER，CHECK IN(0,1)                                                             |
+| JSON  | TEXT，CHECK json_valid；跨语言金额值以十进制分字符串表达                           |
+| REV   | INTEGER正数，乐观锁版本；不是schema_version                                        |
 
 业务金额用i64存储、i128进行中间累加和比例乘法，所有输入/输出做边界检查。IPC的金额使用十进制分字符串，前端显示与编辑采用字符串转换/BigInt，不能先用parseFloat乘100。用于图表的近似Number不允许参与汇总或导出。
 
@@ -101,15 +103,15 @@ P0一个SQLite库只有一个ledger，CHECK固定singleton=1并UNIQUE，其他�
 
 ### 4.2 账本、账户、分类
 
-| 表/阶段 | 字段（含PK/FK） | 约束/用途 |
-|---|---|---|
-| ledgers / P0 S | id ID PK；singleton INTEGER UNIQUE CHECK=1；name TEXT；currency TEXT CHECK='CNY'；timezone TEXT；data_revision INTEGER≥0；settings JSON；default_template_version_id ID? FK→budget_template_versions.id | settings含主题、初始化完成标记、记账起点、备份偏好；业务工资周期用独立表；首次创建默认版本后再设置指针 |
-| account_types / P0 S | id ID PK；ledger_id FK；name TEXT；kind TEXT CHECK='ASSET'；sort_order INTEGER | P0只允许资产性质；用户自定义载体名称不能解锁信用卡/投资能力；类型归档用deleted_at，不影响已有账户 |
-| accounts / P0 S | id ID PK；ledger_id FK；type_id FK→account_types；name TEXT；currency TEXT CHECK='CNY'；balance_start_date DATE；is_hidden BOOL；sort_order INTEGER；note TEXT；archived_at TS? | 不存current_balance或可改opening_balance字段；一次有效OPENING交易，账户基准日一致；资产性质不能由改显示类型改变 |
-| account_role_memberships / P0 S | id ID PK；ledger_id FK；account_id FK→accounts；role TEXT CHECK IN('SALARY','SPENDING','SAVINGS')；effective_from DATE；effective_to DATE? | 同账户可有多角色；同角色同账户有效区间不重叠；日期精度按日，范围半开；新增/变更不重写旧区间 |
-| account_role_defaults / P0 S | id ID PK；ledger_id FK；role TEXT；account_id FK→accounts | 一个角色最多一个当前默认；必须有当前有效membership，且账户可用；删除membership前需处理默认引用 |
-| categories / P0 S | id ID PK；ledger_id FK；kind TEXT CHECK IN('INCOME','EXPENSE')；sort_order INTEGER；archived_at TS? | 稳定身份，与名称/层级版本分开；有引用不能改kind |
-| category_versions / P0 I | id ID PK；category_id FK→categories；version_no INTEGER>0；name TEXT；parent_version_id ID? FK→category_versions；path_label TEXT | UNIQUE(category_id,version_no)；新版本发布后不可改；路径是当时标签快照；父级同ledger同kind，无环；首版最多两级，父节点不直接记账 |
+| 表/阶段                         | 字段（含PK/FK）                                                                                                                                                                                         | 约束/用途                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| ledgers / P0 S                  | id ID PK；singleton INTEGER UNIQUE CHECK=1；name TEXT；currency TEXT CHECK='CNY'；timezone TEXT；data_revision INTEGER≥0；settings JSON；default_template_version_id ID? FK→budget_template_versions.id | settings含主题、初始化完成标记、记账起点、备份偏好；业务工资周期用独立表；首次创建默认版本后再设置指针                           |
+| account_types / P0 S            | id ID PK；ledger_id FK；name TEXT；kind TEXT CHECK='ASSET'；sort_order INTEGER                                                                                                                          | P0只允许资产性质；用户自定义载体名称不能解锁信用卡/投资能力；类型归档用deleted_at，不影响已有账户                                |
+| accounts / P0 S                 | id ID PK；ledger_id FK；type_id FK→account_types；name TEXT；currency TEXT CHECK='CNY'；balance_start_date DATE；is_hidden BOOL；sort_order INTEGER；note TEXT；archived_at TS?                         | 不存current_balance或可改opening_balance字段；一次有效OPENING交易，账户基准日一致；资产性质不能由改显示类型改变                  |
+| account_role_memberships / P0 S | id ID PK；ledger_id FK；account_id FK→accounts；role TEXT CHECK IN('SALARY','SPENDING','SAVINGS')；effective_from DATE；effective_to DATE?                                                              | 同账户可有多角色；同角色同账户有效区间不重叠；日期精度按日，范围半开；新增/变更不重写旧区间                                      |
+| account_role_defaults / P0 S    | id ID PK；ledger_id FK；role TEXT；account_id FK→accounts                                                                                                                                               | 一个角色最多一个当前默认；必须有当前有效membership，且账户可用；删除membership前需处理默认引用                                   |
+| categories / P0 S               | id ID PK；ledger_id FK；kind TEXT CHECK IN('INCOME','EXPENSE')；sort_order INTEGER；archived_at TS?                                                                                                     | 稳定身份，与名称/层级版本分开；有引用不能改kind                                                                                  |
+| category_versions / P0 I        | id ID PK；category_id FK→categories；version_no INTEGER>0；name TEXT；parent_version_id ID? FK→category_versions；path_label TEXT                                                                       | UNIQUE(category_id,version_no)；新版本发布后不可改；路径是当时标签快照；父级同ledger同kind，无环；首版最多两级，父节点不直接记账 |
 
 显示当前分类取该ID最新版本，历史交易/预算指向确切版本。父类改名只影响之后创建的子类版本；服务在同一操作中发布受影响子类的新版本，历史引用保持不动。UI当前分组与历史分组因此都有确定路径。账户改名在当前列表统一使用新名，旧名从audit_events还原；账户ID保持不变，不改历史金额。
 
@@ -117,16 +119,16 @@ P0一个SQLite库只有一个ledger，CHECK固定singleton=1并UNIQUE，其他�
 
 ### 4.3 模板、工资规则与预算周期
 
-| 表/阶段 | 字段（含PK/FK） | 约束/用途 |
-|---|---|---|
-| budget_templates / P0 S | id ID PK；ledger_id FK；name TEXT；origin TEXT CHECK IN('SYSTEM','PERSONAL')；seed_key TEXT?；seed_version TEXT?；archived_at TS? | SYSTEM应用只读；来自可版本化配置资源；PERSONAL可迭代，P0只暴露一个个人默认，P1开放多模板 |
-| budget_template_versions / P0 I | id ID PK；template_id FK→budget_templates；version_no INTEGER>0；reason TEXT | UNIQUE(template_id,version_no)；完整快照头；空白模板也有版本 |
-| budget_template_items / P0 I | id ID PK；template_version_id FK→budget_template_versions；category_id FK→categories；category_version_id FK→category_versions；amount_minor MONEY≥0；is_enabled BOOL；note TEXT；sort_order INTEGER | UNIQUE(template_version_id,category_id)；版本ID必须属于同一category；只有支出叶子分类；停用额度不计总额 |
-| cycle_rules / P0 I | id ID PK；ledger_id FK；effective_from DATE；payday INTEGER CHECK BETWEEN 1 AND 31；short_month_policy TEXT CHECK='LAST_DAY'；reason TEXT | UNIQUE(ledger_id,effective_from)；规则按时间追加；历史引用不改；不支持多组重叠周期 |
-| budget_cycles / P0 S | id ID PK；ledger_id FK；rule_id FK→cycle_rules；start_date DATE；end_date_exclusive DATE；status TEXT CHECK IN('DRAFT','OPEN','CLOSED')；data_completeness TEXT CHECK IN('COMPLETE','PARTIAL','UNKNOWN')；recorded_from DATE?；expected_income_minor MONEY? CHECK≥0；note TEXT | start<end；UNIQUE(ledger_id,start_date)；触发器防重叠，服务保证已覆盖区间连续；有引用不删除 |
-| cycle_budget_versions / P0 I | id ID PK；cycle_id FK→budget_cycles；version_no INTEGER>0；source_kind TEXT CHECK IN('DEFAULT','PREVIOUS','BLANK','EDIT','TEMPLATE')；source_template_version_id ID? FK→budget_template_versions；source_cycle_budget_version_id ID? FK→cycle_budget_versions；reason TEXT | UNIQUE(cycle_id,version_no)；第1版为最初预算；最新版本为当前；来源字段按kind校验；完整快照 |
-| cycle_budget_items / P0 I | id ID PK；budget_version_id FK→cycle_budget_versions；category_id FK→categories；category_version_id FK→category_versions；amount_minor MONEY≥0；is_enabled BOOL；note TEXT；sort_order INTEGER | UNIQUE(budget_version_id,category_id)；停用/删除行保留0有效额度；实际从交易算，不存在actual字段 |
-| cycle_settlements / P0 I | id ID PK；cycle_id FK→budget_cycles；settlement_no INTEGER>0；budget_version_id FK→cycle_budget_versions；data_revision INTEGER；rule_version TEXT；metrics JSON；note TEXT；settled_at TS | UNIQUE(cycle_id,settlement_no)；metrics存当时I/E/B/S/调整及期末账户余额字符串；旧快照不更新 |
+| 表/阶段                         | 字段（含PK/FK）                                                                                                                                                                                                                                                                | 约束/用途                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| budget_templates / P0 S         | id ID PK；ledger_id FK；name TEXT；origin TEXT CHECK IN('SYSTEM','PERSONAL')；seed_key TEXT?；seed_version TEXT?；archived_at TS?                                                                                                                                              | SYSTEM应用只读；来自可版本化配置资源；PERSONAL可迭代，P0只暴露一个个人默认，P1开放多模板                |
+| budget_template_versions / P0 I | id ID PK；template_id FK→budget_templates；version_no INTEGER>0；reason TEXT                                                                                                                                                                                                   | UNIQUE(template_id,version_no)；完整快照头；空白模板也有版本                                            |
+| budget_template_items / P0 I    | id ID PK；template_version_id FK→budget_template_versions；category_id FK→categories；category_version_id FK→category_versions；amount_minor MONEY≥0；is_enabled BOOL；note TEXT；sort_order INTEGER                                                                           | UNIQUE(template_version_id,category_id)；版本ID必须属于同一category；只有支出叶子分类；停用额度不计总额 |
+| cycle_rules / P0 I              | id ID PK；ledger_id FK；effective_from DATE；payday INTEGER CHECK BETWEEN 1 AND 31；short_month_policy TEXT CHECK='LAST_DAY'；reason TEXT                                                                                                                                      | UNIQUE(ledger_id,effective_from)；规则按时间追加；历史引用不改；不支持多组重叠周期                      |
+| budget_cycles / P0 S            | id ID PK；ledger_id FK；rule_id FK→cycle_rules；start_date DATE；end_date_exclusive DATE；status TEXT CHECK IN('DRAFT','OPEN','CLOSED')；data_completeness TEXT CHECK IN('COMPLETE','PARTIAL','UNKNOWN')；recorded_from DATE?；expected_income_minor MONEY? CHECK≥0；note TEXT | start<end；UNIQUE(ledger_id,start_date)；触发器防重叠，服务保证已覆盖区间连续；有引用不删除             |
+| cycle_budget_versions / P0 I    | id ID PK；cycle_id FK→budget_cycles；version_no INTEGER>0；source_kind TEXT CHECK IN('DEFAULT','PREVIOUS','BLANK','EDIT','TEMPLATE')；source_template_version_id ID? FK→budget_template_versions；source_cycle_budget_version_id ID? FK→cycle_budget_versions；reason TEXT     | UNIQUE(cycle_id,version_no)；第1版为最初预算；最新版本为当前；来源字段按kind校验；完整快照              |
+| cycle_budget_items / P0 I       | id ID PK；budget_version_id FK→cycle_budget_versions；category_id FK→categories；category_version_id FK→category_versions；amount_minor MONEY≥0；is_enabled BOOL；note TEXT；sort_order INTEGER                                                                                | UNIQUE(budget_version_id,category_id)；停用/删除行保留0有效额度；实际从交易算，不存在actual字段         |
+| cycle_settlements / P0 I        | id ID PK；cycle_id FK→budget_cycles；settlement_no INTEGER>0；budget_version_id FK→cycle_budget_versions；data_revision INTEGER；rule_version TEXT；metrics JSON；note TEXT；settled_at TS                                                                                     | UNIQUE(cycle_id,settlement_no)；metrics存当时I/E/B/S/调整及期末账户余额字符串；旧快照不更新             |
 
 周期状态变更写audit_events。结算的预算版本必须属于同周期；打开后再关闭生成新快照，不覆写settlement_no。当前是否已被修订由周期状态、最新结算和该周期受影响审计事件判断；全账本data_revision不同本身不代表此周期过期，UI不能因修改无关月份就把全部历史结算标脏。
 
@@ -134,24 +136,24 @@ affected_scope必须记录旧/新日期、旧/新账户、直接影响周期以�
 
 ### 4.4 交易事实、操作与审计
 
-| 表/阶段 | 字段（含PK/FK） | 约束/用途 |
-|---|---|---|
-| operation_batches / P0 I | id ID PK（即operation_id）；ledger_id FK；operation_kind TEXT；request_hash TEXT；result JSON；committed_at TS | 幂等提交结果；同ID同请求返回原结果，同ID不同请求拒绝；只保存成功提交，失败整批回滚 |
-| transactions / P0 S | id ID PK；ledger_id FK；kind TEXT CHECK IN('INCOME','EXPENSE','TRANSFER','REFUND','OPENING','ADJUSTMENT')；income_subtype TEXT? CHECK IN('SALARY','OTHER')；amount_minor MONEY；transaction_date DATE；source_account_id ID? FK→accounts；destination_account_id ID? FK→accounts；category_version_id ID? FK→category_versions；budget_cycle_id ID? FK→budget_cycles；original_transaction_id ID? FK→transactions；note TEXT；operation_id ID FK→operation_batches；reconciliation_target_minor MONEY? | 金额/端点按下表检查；operation_id表示创建操作，后续修改批次在audit记录；target仅校准使用，作为当时输入证据 |
-| audit_events / P0 I | id ID PK；ledger_id FK；operation_id FK→operation_batches；entity_type TEXT；entity_id ID；entity_revision INTEGER；action TEXT；before_data JSON?；after_data JSON?；reason TEXT；affected_scope JSON；recorded_at TS | UNIQUE(entity_type,entity_id,entity_revision)；通用实体引用无法用单个FK表达，服务校验，禁止用户写入；全快照包含关联ID、金额字符串、schema/规则版本；affected_scope列出影响账户/周期/日期 |
+| 表/阶段                  | 字段（含PK/FK）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 约束/用途                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| operation_batches / P0 I | id ID PK（即operation_id）；ledger_id FK；operation_kind TEXT；request_hash TEXT；result JSON；committed_at TS                                                                                                                                                                                                                                                                                                                                                                                         | 幂等提交结果；同ID同请求返回原结果，同ID不同请求拒绝；只保存成功提交，失败整批回滚                                                                                                       |
+| transactions / P0 S      | id ID PK；ledger_id FK；kind TEXT CHECK IN('INCOME','EXPENSE','TRANSFER','REFUND','OPENING','ADJUSTMENT')；income_subtype TEXT? CHECK IN('SALARY','OTHER')；amount_minor MONEY；transaction_date DATE；source_account_id ID? FK→accounts；destination_account_id ID? FK→accounts；category_version_id ID? FK→category_versions；budget_cycle_id ID? FK→budget_cycles；original_transaction_id ID? FK→transactions；note TEXT；operation_id ID FK→operation_batches；reconciliation_target_minor MONEY? | 金额/端点按下表检查；operation_id表示创建操作，后续修改批次在audit记录；target仅校准使用，作为当时输入证据                                                                               |
+| audit_events / P0 I      | id ID PK；ledger_id FK；operation_id FK→operation_batches；entity_type TEXT；entity_id ID；entity_revision INTEGER；action TEXT；before_data JSON?；after_data JSON?；reason TEXT；affected_scope JSON；recorded_at TS                                                                                                                                                                                                                                                                                 | UNIQUE(entity_type,entity_id,entity_revision)；通用实体引用无法用单个FK表达，服务校验，禁止用户写入；全快照包含关联ID、金额字符串、schema/规则版本；affected_scope列出影响账户/周期/日期 |
 
 审计是可追溯历史，不是防篡改认证：拥有本机文件写权限的人仍可修改数据库，P0不声称具备不可抵赖性。数据库写入权限集中在服务；审计不可通过产品界面修改/删除。
 
 #### 交易行形状约束
 
-| kind | amount_minor | source | destination | category | budget_cycle | original |
-|---|---:|---|---|---|---|---|
-| INCOME | >0 | NULL | 必填 | 收入叶子版本 | 必填 | NULL |
-| EXPENSE | >0 | 必填 | NULL | 支出叶子版本 | 必填 | NULL |
-| TRANSFER | >0 | 必填 | 必填且不同 | NULL | NULL | NULL |
-| REFUND | >0 | NULL | 必填 | 与原支出同版本 | 必填 | 有效EXPENSE |
-| OPENING | 可为0或有符号 | NULL | 必填 | NULL | NULL | NULL |
-| ADJUSTMENT | 非0有符号 | NULL | 必填 | NULL | NULL | NULL |
+| kind       |  amount_minor | source | destination | category       | budget_cycle | original    |
+| ---------- | ------------: | ------ | ----------- | -------------- | ------------ | ----------- |
+| INCOME     |            >0 | NULL   | 必填        | 收入叶子版本   | 必填         | NULL        |
+| EXPENSE    |            >0 | 必填   | NULL        | 支出叶子版本   | 必填         | NULL        |
+| TRANSFER   |            >0 | 必填   | 必填且不同  | NULL           | NULL         | NULL        |
+| REFUND     |            >0 | NULL   | 必填        | 与原支出同版本 | 必填         | 有效EXPENSE |
+| OPENING    | 可为0或有符号 | NULL   | 必填        | NULL           | NULL         | NULL        |
+| ADJUSTMENT |     非0有符号 | NULL   | 必填        | NULL           | NULL         | NULL        |
 
 INCOME才允许income_subtype且必须非空；其他类型为NULL。期初/校准的amount直接作为signed_delta，普通交易方向由kind决定。所有端点币种一致。transaction_date不早于端点基准日；OPENING必须等于destination.balance_start_date。有效账户必须恰有一个有效期初，禁止单独删除；零期初可随未使用账户一并软删除。P0不支持直接编辑交易kind，错选类型需通过撤销原交易并新建正确交易的显式操作，统一验证依赖。
 
@@ -169,50 +171,50 @@ INCOME才允许income_subtype且必须非空；其他类型为NULL。期初/校�
 
 ### 4.5 账单、分配、导入与备份
 
-| 表/阶段 | 字段（含PK/FK） | 约束/用途 |
-|---|---|---|
-| bill_rules / P0 S | id ID PK；ledger_id FK；name TEXT；amount_minor MONEY>0；account_id FK→accounts；category_version_id FK→category_versions；frequency TEXT CHECK IN('WEEKLY','MONTHLY')；interval_count INTEGER CHECK=1；day_of_month INTEGER?；weekday INTEGER?；start_date DATE；end_date DATE?；short_month_policy TEXT；is_enabled BOOL；note TEXT | 月规则仅day_of_month 1—31，周规则仅weekday 1—7；账户/分类为可用资产/支出叶子；停用不删历史 |
-| bill_occurrences / P0 S | id ID PK；rule_id FK→bill_rules；due_date DATE；snoozed_to DATE?；rule_revision INTEGER；expected_amount_minor MONEY>0；account_id FK→accounts；category_version_id FK→category_versions；status TEXT CHECK IN('PENDING','PAID','SKIPPED')；transaction_id ID? FK→transactions；note TEXT | UNIQUE(rule_id,due_date)；生成时复制规则，PAID必须有有效匹配支出；同支出最多关联一个账单；规则变更不自动改已支付实例 |
-| allocation_plans / P0 S | id ID PK；ledger_id FK；salary_transaction_id FK→transactions；cycle_id FK→budget_cycles；input_snapshot JSON；based_on_data_revision INTEGER；status TEXT CHECK IN('DRAFT','PARTIAL','COMPLETED','CANCELLED') | 工资必须INCOME/SALARY；snapshot含B/E/余额/保留额/选择上限及算法版本；计划金额不参与任何账务统计 |
-| allocation_items / P0 S | id ID PK；plan_id FK→allocation_plans；source_account_id FK→accounts；destination_account_id FK→accounts；amount_minor MONEY>0；status TEXT CHECK IN('PENDING','RECORDED','CANCELLED')；transaction_id ID? FK→transactions | 端点不同；RECORDED必须匹配有效TRANSFER；UNIQUE(transaction_id)防多项重复关联；同plan可有多个计划版本，通过新建计划替换未完成项，已完成关联保留 |
-| import_batches / P0 S | id ID PK；ledger_id FK；source TEXT；file_hash TEXT；original_filename TEXT；mapping JSON；status TEXT CHECK IN('STAGED','COMMITTED','REVERTED','FAILED')；summary JSON；operation_id ID? FK→operation_batches | 文件哈希用于提示不直接拒绝相同文件不同映射；导入摘要保留数量与错误行 |
-| import_rows / P0 S | id ID PK；batch_id FK→import_batches；row_number INTEGER>0；raw_data JSON；normalized_data JSON?；fingerprint TEXT?；decision TEXT CHECK IN('PENDING','ACCEPT','SKIP','ERROR')；reason TEXT；transaction_id ID? FK→transactions | UNIQUE(batch_id,row_number)；暂存不计财务统计；已提交映射可审计；可按保留策略清理原始内容，保留行号/决策/映射 |
-| external_transaction_keys / P0 I | id ID PK；ledger_id FK；source TEXT；source_account_key TEXT；external_id TEXT；transaction_id FK→transactions；import_batch_id FK→import_batches | UNIQUE(ledger_id,source,source_account_key,external_id)，包含软删除交易；external_id不能为空串；无强键不创建此行 |
-| backup_runs / P0 S | id ID PK；ledger_id FK；destination_path TEXT；backup_kind TEXT CHECK IN('DAILY','MONTHLY','MANUAL','PRE_MIGRATION','PRE_RESTORE','PRE_IMPORT')；status TEXT CHECK IN('RUNNING','SUCCESS','FAILED','PRUNED')；checksum TEXT?；schema_version INTEGER?；data_revision INTEGER?；finished_at TS?；error_code TEXT? | 运行记录不是备份有效性的唯一证据；恢复后依据备份目录manifest重新扫描 |
-| schema_migrations / P0 I | version INTEGER PK；name TEXT；checksum TEXT；app_version TEXT；applied_at TS；duration_ms INTEGER≥0 | 不带ledger FK；数据库级migration账本，应用版本与数据库版本分开 |
+| 表/阶段                          | 字段（含PK/FK）                                                                                                                                                                                                                                                                                                                       | 约束/用途                                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| bill_rules / P0 S                | id ID PK；ledger_id FK；name TEXT；amount_minor MONEY>0；account_id FK→accounts；category_version_id FK→category_versions；frequency TEXT CHECK IN('WEEKLY','MONTHLY')；interval_count INTEGER CHECK=1；day_of_month INTEGER?；weekday INTEGER?；start_date DATE；end_date DATE?；short_month_policy TEXT；is_enabled BOOL；note TEXT | 月规则仅day_of_month 1—31，周规则仅weekday 1—7；账户/分类为可用资产/支出叶子；停用不删历史                                                     |
+| bill_occurrences / P0 S          | id ID PK；rule_id FK→bill_rules；due_date DATE；snoozed_to DATE?；rule_revision INTEGER；expected_amount_minor MONEY>0；account_id FK→accounts；category_version_id FK→category_versions；status TEXT CHECK IN('PENDING','PAID','SKIPPED')；transaction_id ID? FK→transactions；note TEXT                                             | UNIQUE(rule_id,due_date)；生成时复制规则，PAID必须有有效匹配支出；同支出最多关联一个账单；规则变更不自动改已支付实例                           |
+| allocation_plans / P0 S          | id ID PK；ledger_id FK；salary_transaction_id FK→transactions；cycle_id FK→budget_cycles；input_snapshot JSON；based_on_data_revision INTEGER；status TEXT CHECK IN('DRAFT','PARTIAL','COMPLETED','CANCELLED')                                                                                                                        | 工资必须INCOME/SALARY；snapshot含B/E/余额/保留额/选择上限及算法版本；计划金额不参与任何账务统计                                                |
+| allocation_items / P0 S          | id ID PK；plan_id FK→allocation_plans；source_account_id FK→accounts；destination_account_id FK→accounts；amount_minor MONEY>0；status TEXT CHECK IN('PENDING','RECORDED','CANCELLED')；transaction_id ID? FK→transactions                                                                                                            | 端点不同；RECORDED必须匹配有效TRANSFER；UNIQUE(transaction_id)防多项重复关联；同plan可有多个计划版本，通过新建计划替换未完成项，已完成关联保留 |
+| import_batches / P0 S            | id ID PK；ledger_id FK；source TEXT；file_hash TEXT；original_filename TEXT；mapping JSON；status TEXT CHECK IN('STAGED','COMMITTED','REVERTED','FAILED')；summary JSON；operation_id ID? FK→operation_batches                                                                                                                        | 文件哈希用于提示不直接拒绝相同文件不同映射；导入摘要保留数量与错误行                                                                           |
+| import_rows / P0 S               | id ID PK；batch_id FK→import_batches；row_number INTEGER>0；raw_data JSON；normalized_data JSON?；fingerprint TEXT?；decision TEXT CHECK IN('PENDING','ACCEPT','SKIP','ERROR')；reason TEXT；transaction_id ID? FK→transactions                                                                                                       | UNIQUE(batch_id,row_number)；暂存不计财务统计；已提交映射可审计；可按保留策略清理原始内容，保留行号/决策/映射                                  |
+| external_transaction_keys / P0 I | id ID PK；ledger_id FK；source TEXT；source_account_key TEXT；external_id TEXT；transaction_id FK→transactions；import_batch_id FK→import_batches                                                                                                                                                                                     | UNIQUE(ledger_id,source,source_account_key,external_id)，包含软删除交易；external_id不能为空串；无强键不创建此行                               |
+| backup_runs / P0 S               | id ID PK；ledger_id FK；destination_path TEXT；backup_kind TEXT CHECK IN('DAILY','MONTHLY','MANUAL','PRE_MIGRATION','PRE_RESTORE','PRE_IMPORT')；status TEXT CHECK IN('RUNNING','SUCCESS','FAILED','PRUNED')；checksum TEXT?；schema_version INTEGER?；data_revision INTEGER?；finished_at TS?；error_code TEXT?                      | 运行记录不是备份有效性的唯一证据；恢复后依据备份目录manifest重新扫描                                                                           |
+| schema_migrations / P0 I         | version INTEGER PK；name TEXT；checksum TEXT；app_version TEXT；applied_at TS；duration_ms INTEGER≥0                                                                                                                                                                                                                                  | 不带ledger FK；数据库级migration账本，应用版本与数据库版本分开                                                                                 |
 
 分配后删除或修改真实转账，必须更新分配项状态/关联并重算计划；账单修改/删除同理。导入transaction_id关联可指向已存在交易（跳过/关联），批次撤销只作用于本批新建且无后续依赖的事实，不能删除用户原有交易。
 
 ### 4.6 P1扩展模型（未纳入P0建表）
 
-| 表 | 预期字段与规则 |
-|---|---|
-| financial_goals S | id PK；ledger_id FK；name TEXT；target_minor MONEY>0；deadline DATE?；status ACTIVE/COMPLETED/CANCELLED；priority INTEGER；note TEXT |
+| 表                        | 预期字段与规则                                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| financial_goals S         | id PK；ledger_id FK；name TEXT；target_minor MONEY>0；deadline DATE?；status ACTIVE/COMPLETED/CANCELLED；priority INTEGER；note TEXT                                                              |
 | goal_reservation_events I | id PK；goal_id FK；account_id FK；delta_minor MONEY非0；event_date DATE；reason TEXT；transaction_id? FK；operation_id FK；可预留校验在账户总预留维度进行；释放为负；真实交易与预留事件同一批提交 |
 
 目标当前预留由事件求和，账户当前预留是所有活动目标合计；目标付款释放与支出不能计两次花费。未来信用卡会扩展账户的会计性质和净资产视图，投资再增加估值记录，不能仅换account_types.name获得支持。拆分交易时扩transactions为头/明细模式，并迁移旧单分类记录；多币种需要原币种金额、汇率来源与本位币舍入规则，另立ADR。
 
 ### 4.7 关键索引、外键与删除策略
 
-| 索引/约束 | 列或谓词 | 作用 |
-|---|---|---|
-| idx_tx_date_active | transactions(ledger_id,transaction_date,id) WHERE deleted_at IS NULL | 所有自然时间范围与稳定分页 |
-| idx_tx_source_date / destination_date | transactions(source_account_id,transaction_date,id)、(destination_account_id,transaction_date,id)，均active | 账户余额与资金明细 |
-| idx_tx_cycle_category | transactions(budget_cycle_id,category_version_id,kind) WHERE deleted_at IS NULL | 周期预算实际 |
-| idx_tx_original | transactions(original_transaction_id,deleted_at) | 退款合计/依赖检查 |
-| uq_active_opening | UNIQUE transactions(destination_account_id) WHERE kind='OPENING' AND deleted_at IS NULL | 一个账户一个有效期初 |
-| uq_default_role | UNIQUE account_role_defaults(ledger_id,role) WHERE deleted_at IS NULL | 一个角色最多一个默认 |
-| idx_role_period | account_role_memberships(account_id,role,effective_from,effective_to) | 校验区间重叠、当前用途 |
-| uq_cycle_start / idx_cycle_end | UNIQUE budget_cycles(ledger_id,start_date)；(ledger_id,end_date_exclusive) | 查周期，另用触发器检查范围不重叠 |
-| uq_category_ver / uq_template_ver / uq_budget_ver | category_versions(category_id,version_no)；budget_template_versions(template_id,version_no)；cycle_budget_versions(cycle_id,version_no) | 确定最新/初始版本 |
-| uq_template_item / uq_cycle_item | 对应版本ID+category_id | 防同分类重复预算 |
-| idx_audit_entity / idx_audit_operation | audit_events(entity_type,entity_id,entity_revision)；(operation_id) | 修改历史与整组操作恢复 |
-| uq_bill_due / idx_bill_pending | UNIQUE bill_occurrences(rule_id,due_date)；(status,due_date) | 防重复实例和到期待办 |
-| uq_bill_transaction | UNIQUE bill_occurrences(transaction_id) WHERE transaction_id IS NOT NULL AND deleted_at IS NULL | 一个支出不重复满足两账单 |
-| uq_allocation_transaction | UNIQUE allocation_items(transaction_id) WHERE transaction_id IS NOT NULL AND deleted_at IS NULL | 同转账不重复分配 |
-| uq_active_salary_plan | UNIQUE allocation_plans(salary_transaction_id) WHERE deleted_at IS NULL AND status IN('DRAFT','PARTIAL') | 同一工资最多一份未完成计划；累计已分配额度另外由服务跨计划校验 |
-| idx_import_fingerprint | import_rows(fingerprint) | 弱去重候选检索，不加UNIQUE |
-| uq_external_key | external_transaction_keys(ledger_id,source,source_account_key,external_id) | 来源强幂等，软删除不释放唯一键 |
+| 索引/约束                                         | 列或谓词                                                                                                                                | 作用                                                           |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| idx_tx_date_active                                | transactions(ledger_id,transaction_date,id) WHERE deleted_at IS NULL                                                                    | 所有自然时间范围与稳定分页                                     |
+| idx_tx_source_date / destination_date             | transactions(source_account_id,transaction_date,id)、(destination_account_id,transaction_date,id)，均active                             | 账户余额与资金明细                                             |
+| idx_tx_cycle_category                             | transactions(budget_cycle_id,category_version_id,kind) WHERE deleted_at IS NULL                                                         | 周期预算实际                                                   |
+| idx_tx_original                                   | transactions(original_transaction_id,deleted_at)                                                                                        | 退款合计/依赖检查                                              |
+| uq_active_opening                                 | UNIQUE transactions(destination_account_id) WHERE kind='OPENING' AND deleted_at IS NULL                                                 | 一个账户一个有效期初                                           |
+| uq_default_role                                   | UNIQUE account_role_defaults(ledger_id,role) WHERE deleted_at IS NULL                                                                   | 一个角色最多一个默认                                           |
+| idx_role_period                                   | account_role_memberships(account_id,role,effective_from,effective_to)                                                                   | 校验区间重叠、当前用途                                         |
+| uq_cycle_start / idx_cycle_end                    | UNIQUE budget_cycles(ledger_id,start_date)；(ledger_id,end_date_exclusive)                                                              | 查周期，另用触发器检查范围不重叠                               |
+| uq_category_ver / uq_template_ver / uq_budget_ver | category_versions(category_id,version_no)；budget_template_versions(template_id,version_no)；cycle_budget_versions(cycle_id,version_no) | 确定最新/初始版本                                              |
+| uq_template_item / uq_cycle_item                  | 对应版本ID+category_id                                                                                                                  | 防同分类重复预算                                               |
+| idx_audit_entity / idx_audit_operation            | audit_events(entity_type,entity_id,entity_revision)；(operation_id)                                                                     | 修改历史与整组操作恢复                                         |
+| uq_bill_due / idx_bill_pending                    | UNIQUE bill_occurrences(rule_id,due_date)；(status,due_date)                                                                            | 防重复实例和到期待办                                           |
+| uq_bill_transaction                               | UNIQUE bill_occurrences(transaction_id) WHERE transaction_id IS NOT NULL AND deleted_at IS NULL                                         | 一个支出不重复满足两账单                                       |
+| uq_allocation_transaction                         | UNIQUE allocation_items(transaction_id) WHERE transaction_id IS NOT NULL AND deleted_at IS NULL                                         | 同转账不重复分配                                               |
+| uq_active_salary_plan                             | UNIQUE allocation_plans(salary_transaction_id) WHERE deleted_at IS NULL AND status IN('DRAFT','PARTIAL')                                | 同一工资最多一份未完成计划；累计已分配额度另外由服务跨计划校验 |
+| idx_import_fingerprint                            | import_rows(fingerprint)                                                                                                                | 弱去重候选检索，不加UNIQUE                                     |
+| uq_external_key                                   | external_transaction_keys(ledger_id,source,source_account_key,external_id)                                                              | 来源强幂等，软删除不释放唯一键                                 |
 
 所有FK子列至少有普通索引，若已是上述复合索引前缀则不重复创建；特别补齐transactions.category_version_id、各表ledger_id、预算来源指针、默认模板指针、账单/分配的transaction_id及审计operation_id。上线前用真实查询计划检查索引，不为每个字段盲目加索引。
 
@@ -220,17 +222,17 @@ SQLite每个连接必须显式PRAGMA foreign_keys=ON；外键关系不负责业�
 
 删除矩阵：
 
-| 数据 | 产品删除 | 物理删除 |
-|---|---|---|
-| 交易 | deleted_at软删、审计追加、依赖同步 | P0不提供 |
-| 有历史账户/分类 | archived_at，历史可见 | FK RESTRICT |
-| 未使用账户/类型/分类 | 软删，先处理默认/引用 | P0不提供 |
-| 模板/周期预算版本/结算 | 归档模板或重新打开周期，版本不删 | RESTRICT |
-| 已有交易的周期 | 禁止删除，修订须显式重开 | RESTRICT |
-| 固定规则 | 停用/软删，已支付实例保留 | RESTRICT |
-| 导入暂存 | 未提交且无依赖批次可清理 | 仅import_rows→未提交import_batches允许受控清理或CASCADE；已提交禁止级联 |
-| 审计/外部键/migration | 无删除入口 | 禁止常规清理 |
-| 旧备份文件 | 成功验证新备份后按保留策略删除 | 先校验路径在用户配置备份目录内；不是账务行级联 |
+| 数据                   | 产品删除                           | 物理删除                                                                |
+| ---------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| 交易                   | deleted_at软删、审计追加、依赖同步 | P0不提供                                                                |
+| 有历史账户/分类        | archived_at，历史可见              | FK RESTRICT                                                             |
+| 未使用账户/类型/分类   | 软删，先处理默认/引用              | P0不提供                                                                |
+| 模板/周期预算版本/结算 | 归档模板或重新打开周期，版本不删   | RESTRICT                                                                |
+| 已有交易的周期         | 禁止删除，修订须显式重开           | RESTRICT                                                                |
+| 固定规则               | 停用/软删，已支付实例保留          | RESTRICT                                                                |
+| 导入暂存               | 未提交且无依赖批次可清理           | 仅import_rows→未提交import_batches允许受控清理或CASCADE；已提交禁止级联 |
+| 审计/外部键/migration  | 无删除入口                         | 禁止常规清理                                                            |
+| 旧备份文件             | 成功验证新备份后按保留策略删除     | 先校验路径在用户配置备份目录内；不是账务行级联                          |
 
 不使用ON DELETE CASCADE清理财务记录。软删除不会自动触发SQL外键检查失效，因此服务必须检查关联有效性。
 
@@ -313,54 +315,54 @@ CSV文本字段遇=、+、−、@或前导控制字符等潜在公式前缀时�
 
 本节保留46项设计测试规格，不等同于46项均已实现。实际自动化及桌面验证见 [VALIDATION.md](./VALIDATION.md)。金额示例单位元，断言实际使用分的整数。
 
-| ID | 场景与输入 | 预期结果 | 层级 |
-|---|---|---|---|
-| T01 | 0.10+0.20；1852.25输入；1.001输入 | 30分；185225分；三位小数拒绝 | 领域单元 |
-| T02 | 普通交易0/负数/超上限/科学计数法/Unicode异常输入 | 拒绝，数据库无新记录；校准显式符号例外 | 单元+IPC |
-| T03 | 工资账户期初0，工资10000，双击保存 | 余额10000，收入10000，一笔有效交易；相同操作ID重放 | SQLite集成 |
-| T04 | 账户期初1000，支出100 | 余额900，净支出100，净结余−100；无收入储蓄率— | 领域+集成 |
-| T05 | A=1000 B=100，A→B300 | A=700 B=400，总资产1100，I/E/S都不变，交易列表一行 | 集成+E2E |
-| T06 | A→A；故障发生在转账写入与审计之间 | 自转账拒绝；故障整事务回滚，双端余额不变 | 集成故障注入 |
-| T07 | 转账300、手续费2，删除仅转账 | 转账不计收支；手续费计2；删除前明确保留/一并删除费用 | 集成 |
-| T08 | 支出100，退款30+70，再退0.01 | 前两次有效，净支出0；第3次拒绝；I始终不增加 | 领域+集成 |
-| T09 | 支出100已退60，改原额为50/删原交易/恢复旧退款 | 金额修改拒绝；删除须依赖处理；恢复重新验证总额 | 集成 |
-| T10 | 9月9支出100，9月10退30，周期边界9月10 | 原周期E=100，新周期E=−30；退款日账户+30，分类一致 | 集成，依D05 |
-| T11 | 原支出改分类且两退款跨两个已结算周期 | 必须重开影响周期；原/退款统一分类版本；旧结算快照保留 | 集成+E2E |
-| T12 | 期初1000，收入500、支出100、转入200、转出50、退款20、校准−5 | 余额1565；I=500，E=80，S=420；校准不计储蓄 | 领域 |
-| T13 | 校准账面1253.20到实际1248.20，之后补录更早支出3 | 校准保留−5；余额再减3，提示重新核对，不自动把校准变−2 | 集成 |
-| T14 | 早于期初基准日导入交易 | 拒绝直接计入，进入起点扩展预览；调整期初后不双计 | 集成+E2E |
-| T15 | 两账户各花餐饮1000和500，预算1500 | 分类实际1500、剩余0、执行率100%；不按账户重复预算 | 领域 |
-| T16 | B=100，E=79.99/80/100/100.01/110 | 正常/接近/用完/超支/超支；显示四舍五入不改变状态 | 单元 |
-| T17 | B=0，E=0/10/−10；B=100,E=−20 | 未设预算、无除零；负净额保留；剩余120且有退款说明 | 单元 |
-| T18 | 默认房租1850，本期改1852.25仅本期 | 默认仍1850；本期1852.25，初始1850可查 | 集成 |
-| T19 | 同时更新本期和默认中途故障；正常完成后建下期 | 故障两个都回滚；正常下期复制新默认，旧周期不变 | 集成 |
-| T20 | 删/停用预算分类但已有支出50 | 额度按0，实际50仍进全周期支出；不从列表消失 | 集成 |
-| T21 | 系统种子升级、重复首次初始化 | 不覆盖个人/周期预算；不重复创建账户与模板 | 集成 |
-| T22 | 2026-09-09、09-10、10-09、10-10边界 | 每笔收支恰好属于一个正确周期，无重叠或空洞 | 属性+集成 |
-| T23 | 工资日31，2028闰年2月；工资延迟；半年未打开 | 2月边界29日；迟发按实际日；补齐周期不造交易 | 单元+集成 |
-| T24 | 改工资日10→15，从下一边界生效 | 预览过渡短周期；旧边界不变；新周期连续唯一 | 单元+集成 |
-| T25 | 支出从9月9改9月10，账户A改B、金额100改120 | 两周期净额重算，A恢复100/B扣120，修订一笔交易 | 集成 |
-| T26 | I=10000,E=8000；转5000到储蓄；I=0,E=−30；I=100,E=−20 | S=2000/率20%不因转账改变；无收入率—；退款场景率120% | 单元 |
-| T27 | 全部12种指定时间口径，在首尾日各有交易 | start包括/end排除；7/30/90天分别恰好N天；各月份无近似30天替代 | 属性+集成 |
-| T28 | T=2026-09-06，最近90天与3个月；闰年/12月跨年/周一边界 | 90天6/9起；3个月6/7起；日历移位与周规则准确 | 单元 |
-| T29 | 三笔交易，单笔有多次退款与多条审计，按分类JOIN统计 | 金额不因一对多JOIN膨胀；明细和总额一致 | 集成 |
-| T30 | 隐藏/归档账户，账户改名/换默认角色 | 全账本余额不变；新默认用于新表单；历史账户ID不变 | 集成+E2E |
-| T31 | 分类改名/换父类，新旧版本各有消费 | 历史路径保持，按稳定category_id预算归集正确 | 集成 |
-| T32 | 同一账单多次启动、重复确认、支付交易删除 | 一个实例一笔支出；删除后回待确认；规则改动不改已支付 | 集成 |
-| T33 | 同文件重导、两个来源同额消费、同日同额真实两次 | 强键跳过；弱匹配待确认；允许保留两笔；删后重导提示恢复 | 集成+E2E |
-| T34 | 导入第N行失败；导入后交易被修改再撤销批次 | 整批回滚无半批；有后续依赖阻止一键撤销 | 集成 |
-| T35 | 同时两窗口编辑revision=1；保存第一版后第二版提交 | 第一成功，第二版本冲突，保留编辑内容且不覆盖 | 集成 |
-| T36 | 完整备份包含软删/预算历史，恢复再核对 | 数据字典规定的完整性、金额、版本数全部一致 | 文件集成 |
-| T37 | 活跃WAL写入时备份；磁盘满、权限拒绝、坏校验和 | 快照一致；失败不标成功且不删旧备份；坏文件拒绝恢复 | 故障注入 |
-| T38 | 恢复换文件前/后进程崩溃，新旧WAL并存 | 启动按阶段恢复一套完整库，不串配WAL，不丢旧安全快照 | Windows故障注入 |
-| T39 | 每个历史schema升级、升级中断、未来schema | 金额/引用保真，失败旧库可用，未来版本拒绝写入 | migration集成 |
-| T40 | 工资10000、B5200、消费700；期中已花1200 | 初期补4500/储蓄5500；期中补3300；余额变化要求刷新计划 | 领域+E2E |
-| T41 | 工资与消费同账户，余额10000，剩余预算5200 | 无自转账，保留5200，最多转储蓄4800 | 领域 |
-| T42 | 确认部分分配后重试/关联手工转账/删除关联转账 | 已完成项不重记；绑定唯一；删除后状态可解释 | 集成 |
-| T43 | CSV/XLSX文本含公式、逗号、换行、长中文；JSON大整数 | 无公式执行意图，转义可解释，精度不经浮点损失 | 序列化单元 |
-| T44 | 结算→改历史→重结算，同时修改无关月份 | 相关旧快照标修订，生成新版本；无关结算不误标过期 | 集成 |
-| T45 | 随机收支/转账/退款/编辑/删除序列 | 转账全账本delta=0；余额守恒；有效退款≤原额；预算与明细相等 | 属性测试 |
-| T46 | P1两目标共享一账户且余额不足；目标消费 | 不能重复预留；付款和释放各在其维度计一次；缺口可见 | P1属性+集成 |
+| ID  | 场景与输入                                                  | 预期结果                                                      | 层级            |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------------- | --------------- |
+| T01 | 0.10+0.20；1852.25输入；1.001输入                           | 30分；185225分；三位小数拒绝                                  | 领域单元        |
+| T02 | 普通交易0/负数/超上限/科学计数法/Unicode异常输入            | 拒绝，数据库无新记录；校准显式符号例外                        | 单元+IPC        |
+| T03 | 工资账户期初0，工资10000，双击保存                          | 余额10000，收入10000，一笔有效交易；相同操作ID重放            | SQLite集成      |
+| T04 | 账户期初1000，支出100                                       | 余额900，净支出100，净结余−100；无收入储蓄率—                 | 领域+集成       |
+| T05 | A=1000 B=100，A→B300                                        | A=700 B=400，总资产1100，I/E/S都不变，交易列表一行            | 集成+E2E        |
+| T06 | A→A；故障发生在转账写入与审计之间                           | 自转账拒绝；故障整事务回滚，双端余额不变                      | 集成故障注入    |
+| T07 | 转账300、手续费2，删除仅转账                                | 转账不计收支；手续费计2；删除前明确保留/一并删除费用          | 集成            |
+| T08 | 支出100，退款30+70，再退0.01                                | 前两次有效，净支出0；第3次拒绝；I始终不增加                   | 领域+集成       |
+| T09 | 支出100已退60，改原额为50/删原交易/恢复旧退款               | 金额修改拒绝；删除须依赖处理；恢复重新验证总额                | 集成            |
+| T10 | 9月9支出100，9月10退30，周期边界9月10                       | 原周期E=100，新周期E=−30；退款日账户+30，分类一致             | 集成，依D05     |
+| T11 | 原支出改分类且两退款跨两个已结算周期                        | 必须重开影响周期；原/退款统一分类版本；旧结算快照保留         | 集成+E2E        |
+| T12 | 期初1000，收入500、支出100、转入200、转出50、退款20、校准−5 | 余额1565；I=500，E=80，S=420；校准不计储蓄                    | 领域            |
+| T13 | 校准账面1253.20到实际1248.20，之后补录更早支出3             | 校准保留−5；余额再减3，提示重新核对，不自动把校准变−2         | 集成            |
+| T14 | 早于期初基准日导入交易                                      | 拒绝直接计入，进入起点扩展预览；调整期初后不双计              | 集成+E2E        |
+| T15 | 两账户各花餐饮1000和500，预算1500                           | 分类实际1500、剩余0、执行率100%；不按账户重复预算             | 领域            |
+| T16 | B=100，E=79.99/80/100/100.01/110                            | 正常/接近/用完/超支/超支；显示四舍五入不改变状态              | 单元            |
+| T17 | B=0，E=0/10/−10；B=100,E=−20                                | 未设预算、无除零；负净额保留；剩余120且有退款说明             | 单元            |
+| T18 | 默认房租1850，本期改1852.25仅本期                           | 默认仍1850；本期1852.25，初始1850可查                         | 集成            |
+| T19 | 同时更新本期和默认中途故障；正常完成后建下期                | 故障两个都回滚；正常下期复制新默认，旧周期不变                | 集成            |
+| T20 | 删/停用预算分类但已有支出50                                 | 额度按0，实际50仍进全周期支出；不从列表消失                   | 集成            |
+| T21 | 系统种子升级、重复首次初始化                                | 不覆盖个人/周期预算；不重复创建账户与模板                     | 集成            |
+| T22 | 2026-09-09、09-10、10-09、10-10边界                         | 每笔收支恰好属于一个正确周期，无重叠或空洞                    | 属性+集成       |
+| T23 | 工资日31，2028闰年2月；工资延迟；半年未打开                 | 2月边界29日；迟发按实际日；补齐周期不造交易                   | 单元+集成       |
+| T24 | 改工资日10→15，从下一边界生效                               | 预览过渡短周期；旧边界不变；新周期连续唯一                    | 单元+集成       |
+| T25 | 支出从9月9改9月10，账户A改B、金额100改120                   | 两周期净额重算，A恢复100/B扣120，修订一笔交易                 | 集成            |
+| T26 | I=10000,E=8000；转5000到储蓄；I=0,E=−30；I=100,E=−20        | S=2000/率20%不因转账改变；无收入率—；退款场景率120%           | 单元            |
+| T27 | 全部12种指定时间口径，在首尾日各有交易                      | start包括/end排除；7/30/90天分别恰好N天；各月份无近似30天替代 | 属性+集成       |
+| T28 | T=2026-09-06，最近90天与3个月；闰年/12月跨年/周一边界       | 90天6/9起；3个月6/7起；日历移位与周规则准确                   | 单元            |
+| T29 | 三笔交易，单笔有多次退款与多条审计，按分类JOIN统计          | 金额不因一对多JOIN膨胀；明细和总额一致                        | 集成            |
+| T30 | 隐藏/归档账户，账户改名/换默认角色                          | 全账本余额不变；新默认用于新表单；历史账户ID不变              | 集成+E2E        |
+| T31 | 分类改名/换父类，新旧版本各有消费                           | 历史路径保持，按稳定category_id预算归集正确                   | 集成            |
+| T32 | 同一账单多次启动、重复确认、支付交易删除                    | 一个实例一笔支出；删除后回待确认；规则改动不改已支付          | 集成            |
+| T33 | 同文件重导、两个来源同额消费、同日同额真实两次              | 强键跳过；弱匹配待确认；允许保留两笔；删后重导提示恢复        | 集成+E2E        |
+| T34 | 导入第N行失败；导入后交易被修改再撤销批次                   | 整批回滚无半批；有后续依赖阻止一键撤销                        | 集成            |
+| T35 | 同时两窗口编辑revision=1；保存第一版后第二版提交            | 第一成功，第二版本冲突，保留编辑内容且不覆盖                  | 集成            |
+| T36 | 完整备份包含软删/预算历史，恢复再核对                       | 数据字典规定的完整性、金额、版本数全部一致                    | 文件集成        |
+| T37 | 活跃WAL写入时备份；磁盘满、权限拒绝、坏校验和               | 快照一致；失败不标成功且不删旧备份；坏文件拒绝恢复            | 故障注入        |
+| T38 | 恢复换文件前/后进程崩溃，新旧WAL并存                        | 启动按阶段恢复一套完整库，不串配WAL，不丢旧安全快照           | Windows故障注入 |
+| T39 | 每个历史schema升级、升级中断、未来schema                    | 金额/引用保真，失败旧库可用，未来版本拒绝写入                 | migration集成   |
+| T40 | 工资10000、B5200、消费700；期中已花1200                     | 初期补4500/储蓄5500；期中补3300；余额变化要求刷新计划         | 领域+E2E        |
+| T41 | 工资与消费同账户，余额10000，剩余预算5200                   | 无自转账，保留5200，最多转储蓄4800                            | 领域            |
+| T42 | 确认部分分配后重试/关联手工转账/删除关联转账                | 已完成项不重记；绑定唯一；删除后状态可解释                    | 集成            |
+| T43 | CSV/XLSX文本含公式、逗号、换行、长中文；JSON大整数          | 无公式执行意图，转义可解释，精度不经浮点损失                  | 序列化单元      |
+| T44 | 结算→改历史→重结算，同时修改无关月份                        | 相关旧快照标修订，生成新版本；无关结算不误标过期              | 集成            |
+| T45 | 随机收支/转账/退款/编辑/删除序列                            | 转账全账本delta=0；余额守恒；有效退款≤原额；预算与明细相等    | 属性测试        |
+| T46 | P1两目标共享一账户且余额不足；目标消费                      | 不能重复预留；付款和释放各在其维度计一次；缺口可见            | P1属性+集成     |
 
 测试数据采用固定时钟、固定时区、临时真实SQLite文件和可重现随机种子。至少包括：20账户/100分类/100,000交易、十年数据、中文路径、长名称、部分周期、无收入、超预算、多个退款和导入依赖。
 
@@ -370,16 +372,16 @@ CSV文本字段遇=、+、−、@或前导控制字符等潜在公式前缀时�
 
 估算按一位能维护前后端的开发者、每工作日有效投入计算，仅为规划范围；AI辅助不等于跳过实机验证。建议累计约27—44个工作日，决策改变、数据适配和签名采购另估。
 
-| 阶段 | 预计 | 产出 | 进入下一阶段条件 |
-|---|---:|---|---|
-| M0 方案确认 | 1—2日 | 四份核心文档、D决策记录、低保真走查 | 用户明确确认关键决策；本轮停在本阶段草稿 |
-| M1 技术/数据库纵切片 | 3—5日 | 最小桌面窗口、打包、精确金额、一笔转账、SQLite约束、备份恢复试验 | Windows实机可运行；T01/T05/T06/T36—T39关键链路通过；据结果定框架 |
-| M2 基础账本 | 5—8日 | 初始化、账户/分类、收支/转账/退款、审计/软删/校准 | 余额守恒、退款依赖、编辑删除测试通过 |
-| M3 预算和工资周期 | 5—8日 | 三层预算、周期、分配助手、结算、简单账单 | 模板隔离、跨期修改、期初/月底规则测试通过 |
-| M4 总览/分析/数据交换 | 5—8日 | 完整时间范围、基础图表、CSV导入、CSV/JSON导出 | 汇总与下钻一致；导入幂等和注入/精度测试通过 |
-| M5 UI/故障验证 | 4—7日 | 主题/键盘/缩放、性能、故障注入、升级与恢复回归 | 无已知金额/丢数据缺陷；100k数据验证；关键E2E通过 |
-| M6 打包与试用准备 | 4—6日 | 安装包、升级说明、使用指南、已知问题清单 | 干净Windows环境安装/升级/卸载保留数据通过；真实备份恢复演练 |
-| M7 实际使用与迭代 | 至少1个工资周期 | 用户真实试用反馈、问题优先级、CHANGELOG | 每周自查与周期结算一致，再决定P1 |
+| 阶段                  |            预计 | 产出                                                             | 进入下一阶段条件                                                 |
+| --------------------- | --------------: | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| M0 方案确认           |           1—2日 | 四份核心文档、D决策记录、低保真走查                              | 用户明确确认关键决策；本轮停在本阶段草稿                         |
+| M1 技术/数据库纵切片  |           3—5日 | 最小桌面窗口、打包、精确金额、一笔转账、SQLite约束、备份恢复试验 | Windows实机可运行；T01/T05/T06/T36—T39关键链路通过；据结果定框架 |
+| M2 基础账本           |           5—8日 | 初始化、账户/分类、收支/转账/退款、审计/软删/校准                | 余额守恒、退款依赖、编辑删除测试通过                             |
+| M3 预算和工资周期     |           5—8日 | 三层预算、周期、分配助手、结算、简单账单                         | 模板隔离、跨期修改、期初/月底规则测试通过                        |
+| M4 总览/分析/数据交换 |           5—8日 | 完整时间范围、基础图表、CSV导入、CSV/JSON导出                    | 汇总与下钻一致；导入幂等和注入/精度测试通过                      |
+| M5 UI/故障验证        |           4—7日 | 主题/键盘/缩放、性能、故障注入、升级与恢复回归                   | 无已知金额/丢数据缺陷；100k数据验证；关键E2E通过                 |
+| M6 打包与试用准备     |           4—6日 | 安装包、升级说明、使用指南、已知问题清单                         | 干净Windows环境安装/升级/卸载保留数据通过；真实备份恢复演练      |
+| M7 实际使用与迭代     | 至少1个工资周期 | 用户真实试用反馈、问题优先级、CHANGELOG                          | 每周自查与周期结算一致，再决定P1                                 |
 
 M0以后必须先获得方案确认。M7是建议用户试用安排，本轮未创建任何定时任务，也不声称应用已经能使用。实际数据首次进入应用前必须有原账单副本，试用期间可与原记录核对。
 

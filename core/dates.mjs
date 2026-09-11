@@ -46,6 +46,17 @@ export function cycleRange(s, payday) {
     ? { start: anchor, end: monthDay(y, m + 1, payday) }
     : { start: monthDay(y, m - 1, payday), end: anchor };
 }
+export function budgetPeriodRange(s, basis = "SALARY", payday = 10) {
+  date(s);
+  if (basis === "SALARY") return cycleRange(s, payday);
+  if (basis === "CALENDAR_MONTH") {
+    const d = new Date(s + "T00:00:00Z"),
+      y = d.getUTCFullYear(),
+      m = d.getUTCMonth();
+    return { start: monthDay(y, m, 1), end: monthDay(y, m + 1, 1) };
+  }
+  throw new Error("预算周期口径无效");
+}
 export function timeRange(mode, anchor = today(), custom = {}) {
   date(anchor);
   const d = new Date(`${anchor}T00:00:00Z`),

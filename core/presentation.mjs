@@ -7,3 +7,19 @@ export function budgetColor(used, total) {
   if (ratio >= 1) return `hsl(0 85% ${Math.max(25, 48 - (ratio - 1) * 18)}%)`;
   return `hsl(${Math.round(130 * (1 - Math.max(0, ratio)))} 65% 38%)`;
 }
+
+// The master switch must allow amounts before a local card/account switch can
+// reveal them. Existing ledgers used hide_amounts, so keep that as the fallback.
+export function amountVisible(settings, scope = "global", key = "") {
+  const visibility = settings?.amount_visibility;
+  const master =
+    typeof visibility?.master === "boolean"
+      ? visibility.master
+      : !settings?.hide_amounts;
+  if (!master) return false;
+  if (scope === "overview") return visibility?.overview?.[key] !== false;
+  if (scope === "account") return visibility?.accounts?.[key] !== false;
+  if (scope === "accountSummary")
+    return visibility?.account_summary !== false;
+  return true;
+}

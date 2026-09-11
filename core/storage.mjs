@@ -2,6 +2,46 @@ import fs from "node:fs";
 import path from "node:path";
 import { Store } from "./store.mjs";
 
+function childPath(parent, candidate) {
+  const base = path.resolve(parent);
+  const target = path.resolve(candidate);
+  const relation = path.relative(base, target);
+  if (!relation || relation.startsWith("..") || path.isAbsolute(relation))
+    throw Error("数据清理路径无效");
+  return target;
+}
+
+export function resetLedgerFiles(directory, backupDirectory, deleteBackups) {
+  const base = path.resolve(directory);
+  const removed = [];
+  for (const name of [
+    "ledger.sqlite",
+    "ledger.sqlite-wal",
+    "ledger.sqlite-shm",
+    "backup-status.json",
+  ]) {
+    const file = childPath(base, path.join(base, name));
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+      removed.push(file);
+    }
+  }
+  if (deleteBackups && fs.existsSync(backupDirectory)) {
+    const backupBase = path.resolve(backupDirectory);
+    for (const entry of fs.readdirSync(backupBase, { withFileTypes: true })) {
+      if (
+        entry.isFile() &&
+        /^SalaryFlow-.*\.sqlite(?:\.json)?$/i.test(entry.name)
+      ) {
+        const file = childPath(backupBase, path.join(backupBase, entry.name));
+        fs.unlinkSync(file);
+        removed.push(file);
+      }
+    }
+  }
+  return { removed: removed.length };
+}
+
 export function readLocation(defaultDirectory) {
   const config = path.join(defaultDirectory, "location.json");
   if (!fs.existsSync(config)) return defaultDirectory;

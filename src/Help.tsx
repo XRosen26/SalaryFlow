@@ -2,6 +2,12 @@ import { useState } from "react";
 import { getLocale } from "./i18n";
 const topics = [
   [
+    "金额快速计算",
+    "Quick amount calculation",
+    "金额输入框支持 +、-、*、/ 和括号，例如输入 12.5+8+6*2，界面会先显示计算结果，保存时只生成一笔交易。普通金额仍最多两位小数；除法等产生更多小数时，最终结果四舍五入到分。合并后无法分别分析每个组成金额，需要逐笔统计时请分别记账。",
+    "Amount fields support +, -, *, / and parentheses. For example, 12.5+8+6*2 shows a result before saving and creates one transaction. Plain amounts still allow at most two decimal places; calculations are rounded to cents only at the final result. Combined parts cannot be analyzed separately, so record separate transactions when you need item-level analysis.",
+  ],
+  [
     "记账与保存",
     "Recording & saving",
     "填写实际日期、账户和金额，点击保存后写入本地SQLite。每笔交易只存一次；修改增加审计历史，不增加一笔收入。未点击保存的表单不算账。",
@@ -26,10 +32,10 @@ const topics = [
     "Start a refund from its original expense. Use the remaining refundable amount or 25/50/75 percent, or enter an amount. Refunds reduce spending in the receipt period. Investment income includes received interest, dividends and realized gains, not returned or transferred principal.",
   ],
   [
-    "工资分配与周期",
-    "Salary allocation & cycles",
-    "标记工资收入后可生成分配计划，软件不会操作银行账户。完成现实转账后才确认。预算页可前往修改工资日，待生效规则可再次修改；当前周期边界只允许保留现有交易且衔接相邻周期的安全更正。结算历史不能直接重划。",
-    "Mark salary income to create an allocation plan. The app cannot operate bank accounts; confirm transfers after completing them externally. Change payday for the next cycle. Current boundaries may be corrected only when existing transactions and adjacent cycles remain consistent. Settled history cannot be redrawn.",
+    "工资分配与预算周期",
+    "Salary allocation & budget periods",
+    "工资分配现在是独立一级页面。标记工资收入后，助手按剩余预算和主要消费账户余额计算补足额，并把余款安排到储蓄或理财；软件不会操作银行。预算可按工资周期或自然月管理，规则可立即、下周期或指定未来日期生效。",
+    "Salary allocation is a main page. After marking salary income, it uses remaining budget and the primary spending balance to calculate a top-up and direct the remainder to savings or investments. It never operates a bank. Budgets can use salary cycles or calendar months, with immediate, next-period or specified-date changes.",
   ],
   [
     "统计分析与空数据",
@@ -50,10 +56,16 @@ const topics = [
     "Transactions are soft-deleted and can be restored subject to consistency checks. Archiving preserves history. Clearing UI cache keeps the ledger, audit and backups. Restoring a backup replaces the ledger after a safety snapshot. Files are unencrypted; hiding amounts is visual only.",
   ],
   [
+    "关于作者",
+    "About the creator",
+    "XRosen26 使用 Codex 完成了这个产品。",
+    "XRosen26 created this product with Codex.",
+  ],
+  [
     "关于本程序",
     "About this application",
-    "薪流 SalaryFlow 0.4.0。本地个人预算与现金流工具，面向单人单账本人民币资产管理。帮助与截图可在项目README和test-results查看。信用卡、估值、多币种及云同步尚未实现。",
-    "SalaryFlow 0.4.0 is a local budgeting and cash-flow tool for one person and one CNY asset ledger. See the project README and test-results for additional guidance and screenshots. Credit cards, valuations, multiple currencies and cloud sync are not implemented.",
+    "薪流 SalaryFlow 0.6.2。本地个人预算与现金流工具，面向单人单账本人民币资产管理。理财账户支持手工估值快照，市场涨跌不计收支。信用卡、多币种、银行直连及云同步尚未实现。",
+    "SalaryFlow 0.6.2 is a local budgeting and cash-flow tool for one person and one CNY asset ledger. Investment accounts support manual valuation snapshots without counting market changes as income or expense. Credit cards, multiple currencies, bank connections and cloud sync are not implemented.",
   ],
 ];
 export function Help() {
