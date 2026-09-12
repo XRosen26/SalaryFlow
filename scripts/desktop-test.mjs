@@ -133,7 +133,39 @@ try {
     await page.waitForTimeout(150);
     if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
       await page.screenshot({ path: path.join(result, file + ".png") });
+    if (name === "交易记录") {
+      await page.getByLabel("交易排序").selectOption("amount_desc");
+      assert.equal(
+        await page.getByLabel("交易排序").inputValue(),
+        "amount_desc",
+      );
+    }
+    if (name === "统计分析") {
+      assert(
+        (await page.locator(".chart-value-label").count()) > 0,
+        "趋势图没有直接金额标签",
+      );
+      assert(
+        (await page.locator(".donut-slice-label").count()) > 0,
+        "环形图没有直接占比标签",
+      );
+      await page.getByLabel("图表分析维度").selectOption("budget");
+      await page
+        .getByText("预算分布绑定当前所选周期", { exact: false })
+        .waitFor();
+      await page.getByLabel("图表形式").selectOption("bars");
+      assert(
+        (await page.locator(".composition-bar-row").count()) > 0,
+        "预算条形图没有数据",
+      );
+      await page.getByLabel("图表形式").selectOption("donut");
+    }
     if (name === "预算与周期") {
+      await page.getByLabel("预算排序").selectOption("budget_desc");
+      assert.equal(
+        await page.getByLabel("预算排序").inputValue(),
+        "budget_desc",
+      );
       await page
         .getByRole("button", { name: "个人默认预算", exact: true })
         .click();
@@ -243,6 +275,9 @@ try {
           "1100px布局",
           "禁用控件原因悬停说明",
           "说明气泡自动避开卡片和窗口边界",
+          "交易与预算列表排序",
+          "趋势金额与环形占比直接标签",
+          "周期预算环形图和条形图",
         ],
         dataDir: env.SALARYFLOW_DATA_DIR,
       },

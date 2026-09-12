@@ -7,14 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $mobileRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-$buildRoot = 'C:\SalaryFlowAndroidBuild'
-$resolvedBuild = [IO.Path]::GetFullPath($buildRoot).TrimEnd('\')
-if (-not $resolvedBuild.Equals('C:\SalaryFlowAndroidBuild', [StringComparison]::OrdinalIgnoreCase)) {
-  throw "拒绝清理未经核对的构建路径：$resolvedBuild"
-}
-if (Test-Path -LiteralPath $resolvedBuild) {
-  Remove-Item -LiteralPath $resolvedBuild -Recurse -Force
-}
+$resolvedBuild = Join-Path 'C:\' ('sfa-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $resolvedBuild | Out-Null
 
 $excluded = @('node_modules', 'android', 'ios', '.expo', '.expo-export-check', 'release')
@@ -31,10 +24,20 @@ try {
   & npx.cmd expo prebuild --platform android --clean --no-install
   if ($LASTEXITCODE -ne 0) { throw 'Expo Android 预构建失败' }
 
-  $jdk = 'C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot'
-  if (-not (Test-Path -LiteralPath $jdk)) { throw "未找到 JDK 17：$jdk" }
-  $androidSdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
-  if (-not (Test-Path -LiteralPath $androidSdk)) { throw "未找到 Android SDK：$androidSdk" }
+  $jdkCandidates = @(
+    $env:JAVA_HOME,
+    'D:\Software\Android Studio\jbr',
+    'C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot'
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+  $jdk = $jdkCandidates | Select-Object -First 1
+  if (-not $jdk) { throw '未找到 JDK 17；优先检查 D:\Software\Android Studio\jbr 或 JAVA_HOME' }
+  $sdkCandidates = @(
+    $env:ANDROID_HOME,
+    $env:ANDROID_SDK_ROOT,
+    (Join-Path $env:LOCALAPPDATA 'Android\Sdk')
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+  $androidSdk = $sdkCandidates | Select-Object -First 1
+  if (-not $androidSdk) { throw '未找到 Android SDK；请设置 ANDROID_HOME' }
   $env:JAVA_HOME = $jdk
   $env:ANDROID_HOME = $androidSdk
   $env:ANDROID_SDK_ROOT = $androidSdk
@@ -54,7 +57,7 @@ try {
   $releaseRoot = Join-Path $mobileRoot 'release'
   New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
   Get-ChildItem -LiteralPath $releaseRoot -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.apk', '.sha256' } | Remove-Item -Force
-  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-0.1.0-preview-$Architecture.apk"
+  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-0.2.0-preview-$Architecture.apk"
   Copy-Item -LiteralPath $builtApk -Destination $outputApk -Force
   $hash = (Get-FileHash -LiteralPath $outputApk -Algorithm SHA256).Hash
   "$hash  $(Split-Path -Leaf $outputApk)" | Set-Content -LiteralPath "$outputApk.sha256" -Encoding ascii

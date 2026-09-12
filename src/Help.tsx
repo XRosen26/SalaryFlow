@@ -64,8 +64,8 @@ const topics = [
   [
     "关于本程序",
     "About this application",
-    "薪流 SalaryFlow 0.6.2。本地个人预算与现金流工具，面向单人单账本人民币资产管理。理财账户支持手工估值快照，市场涨跌不计收支。信用卡、多币种、银行直连及云同步尚未实现。",
-    "SalaryFlow 0.6.2 is a local budgeting and cash-flow tool for one person and one CNY asset ledger. Investment accounts support manual valuation snapshots without counting market changes as income or expense. Credit cards, multiple currencies, bank connections and cloud sync are not implemented.",
+    "薪流 SalaryFlow 0.7.0。本地个人预算与现金流工具，面向单人单账本人民币资产管理。理财账户支持手工估值快照，市场涨跌不计收支。信用卡、多币种、银行直连及云同步尚未实现。",
+    "SalaryFlow 0.7.0 is a local budgeting and cash-flow tool for one person and one CNY asset ledger. Investment accounts support manual valuation snapshots without counting market changes as income or expense. Credit cards, multiple currencies, bank connections and cloud sync are not implemented.",
   ],
 ];
 export function Help() {

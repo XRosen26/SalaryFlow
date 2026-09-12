@@ -442,7 +442,7 @@ export class Store {
     );
     const valuationMode =
       p.valuation_mode === undefined
-        ? old?.valuation_mode ?? 0
+        ? (old?.valuation_mode ?? 0)
         : p.valuation_mode
           ? 1
           : 0;
@@ -1205,13 +1205,13 @@ export class Store {
       for (const row of this.all(sql, ...params)) {
         if (row.destination_id === account.id)
           movement += BigInt(row.amount_minor);
-        if (row.source_id === account.id)
-          movement -= BigInt(row.amount_minor);
+        if (row.source_id === account.id) movement -= BigInt(row.amount_minor);
       }
       result[account.id] = BigInt(valuation.value_minor) + movement;
     }
     return result;
-  }  calibrate(p) {
+  }
+  calibrate(p) {
     const a = this.account(p.account_id);
     ensure(!a.valuation_mode, "理财估值账户请使用更新估值");
     const actual = minor(p.actual_minor, { signed: true, zero: true });
@@ -1418,7 +1418,8 @@ export class Store {
       payday,
       mode,
     };
-  }  adjustCycle(p) {
+  }
+  adjustCycle(p) {
     const c = this.one("SELECT * FROM cycles WHERE id=?", p.id);
     ensure(c && c.status !== "CLOSED", "请先重新打开周期");
     ensure(
@@ -1863,10 +1864,22 @@ export class Store {
         clauses.join(" AND ");
     const total = this.one("SELECT COUNT(*) n " + countFrom, ...filter).n;
     const page = Math.max(0, Math.floor(Number(p.page) || 0));
+    const transactionOrders = {
+      date_desc: "t.date DESC,t.created_at DESC,t.id",
+      date_asc: "t.date ASC,t.created_at ASC,t.id",
+      amount_desc: "t.amount_minor DESC,t.date DESC,t.id",
+      amount_asc: "t.amount_minor ASC,t.date DESC,t.id",
+      category_asc:
+        "COALESCE(v.group_name,''),COALESCE(v.name,''),t.date DESC,t.id",
+      category_desc:
+        "COALESCE(v.group_name,'') DESC,COALESCE(v.name,'') DESC,t.date DESC,t.id",
+    };
+    const transactionOrder =
+      transactionOrders[p.sort] ?? transactionOrders.date_desc;
     const transactions = this.all(
       "SELECT t.*,v.category_id,v.name category_name,v.group_name,a.name source_name,b.name destination_name " +
         from +
-        " ORDER BY t.date DESC,t.created_at DESC,t.id LIMIT 100 OFFSET ?",
+        ` ORDER BY ${transactionOrder} LIMIT 100 OFFSET ?`,
       ...filter,
       page * 100,
     ).map((t) => ({ ...t, amount_minor: String(t.amount_minor) }));
@@ -2130,7 +2143,10 @@ export class Store {
     const source = this.account(salary.destination_id),
       spending = this.account(p.spending_id),
       savings = p.savings_id ? this.account(p.savings_id) : null;
-    ensure(source.id !== savings?.id || source.id === spending.id, "储蓄账户不能与工资源账户相同");
+    ensure(
+      source.id !== savings?.id || source.id === spending.id,
+      "储蓄账户不能与工资源账户相同",
+    );
     ensure(
       !savings || savings.id !== spending.id,
       "消费和储蓄请使用不同账户，或留在原账户",
@@ -2161,7 +2177,8 @@ export class Store {
       cycle.id,
     ))
       cycleSalary += BigInt(row.amount_minor);
-    const limitMode = p.limit_mode ?? (p.cap_minor != null ? "CUSTOM" : "CYCLE_SALARY");
+    const limitMode =
+      p.limit_mode ?? (p.cap_minor != null ? "CUSTOM" : "CYCLE_SALARY");
     ensure(
       ["CYCLE_SALARY", "SOURCE_BALANCE", "CUSTOM"].includes(limitMode),
       "分配上限口径无效",
@@ -2172,8 +2189,7 @@ export class Store {
         : limitMode === "SOURCE_BALANCE"
           ? max(0n, sourceBalance)
           : minor(p.cap_minor, { zero: true });
-    const countedAllocation =
-      limitMode === "SOURCE_BALANCE" ? 0n : allocated;
+    const countedAllocation = limitMode === "SOURCE_BALANCE" ? 0n : allocated;
     const available = min(
       max(0n, cap - countedAllocation),
       max(0n, sourceBalance - reserve),
@@ -2231,7 +2247,8 @@ export class Store {
       items,
       input: { ...p, limit_mode: limitMode, cap_minor: String(cap) },
     };
-  }  saveAllocation(p) {
+  }
+  saveAllocation(p) {
     ensure(
       p.expected_revision === this.settings().revision,
       "余额或预算已变化，请重新计算",
@@ -2329,7 +2346,10 @@ export class Store {
       "SELECT * FROM allocation_plans WHERE id=? AND deleted=0",
       p.id,
     );
-    ensure(plan && ["DRAFT", "PARTIAL"].includes(plan.status), "分配计划已处理");
+    ensure(
+      plan && ["DRAFT", "PARTIAL"].includes(plan.status),
+      "分配计划已处理",
+    );
     const items = this.all(
       "SELECT id FROM allocation_items WHERE plan_id=? AND status='PENDING' ORDER BY id",
       plan.id,

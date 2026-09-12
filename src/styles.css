@@ -2643,3 +2643,339 @@ button.danger-button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* v0.7 analytics palette and interactions */
+:root {
+  --chart-1: #2f8069;
+  --chart-2: #c66c3c;
+  --chart-3: #6f72c9;
+  --chart-4: #d09d2d;
+  --chart-5: #b85078;
+  --chart-6: #4e8fb8;
+  --chart-7: #7b9851;
+  --chart-8: #8a6c9f;
+  --chart-label-on-color: #fff;
+}
+:root[data-palette="ocean"] {
+  --chart-1: #2c70ae;
+  --chart-2: #24a0a3;
+  --chart-3: #6b76cf;
+  --chart-4: #d18435;
+  --chart-5: #b9577b;
+  --chart-6: #508fa5;
+  --chart-7: #759b58;
+  --chart-8: #8a75ad;
+}
+:root[data-palette="violet"] {
+  --chart-1: #7654ad;
+  --chart-2: #b95d87;
+  --chart-3: #4d83b8;
+  --chart-4: #d08b35;
+  --chart-5: #5b9c88;
+  --chart-6: #9b69ad;
+  --chart-7: #7c9250;
+  --chart-8: #b06055;
+}
+:root[data-palette="amber"] {
+  --chart-1: #a26a22;
+  --chart-2: #c2513e;
+  --chart-3: #6485a5;
+  --chart-4: #c39524;
+  --chart-5: #8b6ba4;
+  --chart-6: #4f927f;
+  --chart-7: #9c7a4f;
+  --chart-8: #b65e79;
+}
+:root[data-palette="rose"] {
+  --chart-1: #aa486f;
+  --chart-2: #d0774d;
+  --chart-3: #726fbd;
+  --chart-4: #4c8f91;
+  --chart-5: #c25d57;
+  --chart-6: #5c89ae;
+  --chart-7: #87964d;
+  --chart-8: #98669c;
+}
+:root[data-palette="slate"] {
+  --chart-1: #526f82;
+  --chart-2: #b2674f;
+  --chart-3: #6f7896;
+  --chart-4: #a88a42;
+  --chart-5: #925d72;
+  --chart-6: #4d8584;
+  --chart-7: #73835d;
+  --chart-8: #7f6d8c;
+}
+:root[data-theme="dark"] {
+  --chart-1: #79c7ae;
+  --chart-2: #f0a073;
+  --chart-3: #aaa9ef;
+  --chart-4: #e7c76e;
+  --chart-5: #e58eaf;
+  --chart-6: #8ec5e5;
+  --chart-7: #abc879;
+  --chart-8: #c2a5d1;
+}
+.chart-series-line,
+.trend-bar,
+.trend-point,
+.donut-segment {
+  transition:
+    transform 160ms ease,
+    stroke-width 160ms ease,
+    filter 160ms ease,
+    opacity 160ms ease;
+}
+.chart-mark {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.chart-mark:hover,
+.chart-mark:focus {
+  transform: translateY(-3px);
+  filter: drop-shadow(
+    0 3px 3px color-mix(in srgb, var(--text) 24%, transparent)
+  );
+}
+.donut-segment {
+  transform-origin: 140px 135px;
+  transform-box: view-box;
+}
+.donut-segment:hover,
+.donut-segment:focus {
+  stroke-width: 44;
+  filter: drop-shadow(
+    0 3px 3px color-mix(in srgb, var(--text) 25%, transparent)
+  );
+}
+.chart-value-label {
+  fill: var(--text);
+  font-size: 8px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 2.5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.donut-slice-label {
+  fill: var(--chart-label-on-color);
+  font-size: 10px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: color-mix(in srgb, var(--text) 30%, transparent);
+  stroke-width: 1.5px;
+  pointer-events: none;
+}
+.compact-heading {
+  padding-bottom: 14px;
+}
+.compact-heading select,
+.panel-heading > select {
+  max-width: 220px;
+}
+.composition-bars {
+  display: grid;
+  gap: 14px;
+  padding: 0 24px 24px;
+}
+.composition-bar-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(180px, 1fr) auto;
+  gap: 16px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  opacity: 1;
+}
+.composition-bar-row:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+.composition-bar-label {
+  display: grid;
+  grid-template-columns: 11px minmax(0, 1fr);
+  gap: 3px 8px;
+  align-items: center;
+}
+.composition-bar-label > i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.composition-bar-label > span {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 11px;
+}
+.composition-track {
+  position: relative;
+  overflow: visible;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--soft);
+}
+.composition-track > i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  transition: width 220ms ease;
+}
+.composition-track > em {
+  position: absolute;
+  top: -4px;
+  width: 3px;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--text);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.composition-bar-row > small {
+  min-width: 130px;
+  color: var(--muted);
+}
+.hierarchy-panel {
+  margin-bottom: 22px;
+}
+.hierarchy-list {
+  padding: 0 24px 24px;
+}
+.hierarchy-list details {
+  border-top: 1px solid var(--border);
+  padding: 14px 0;
+}
+.hierarchy-list summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  cursor: pointer;
+  list-style-position: inside;
+}
+.hierarchy-list summary > span {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+}
+.hierarchy-list summary small {
+  color: var(--muted);
+}
+.hierarchy-list summary > span:last-child {
+  margin-left: auto;
+}
+.hierarchy-progress {
+  height: 5px;
+  margin: 10px 0 4px 22px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--soft);
+}
+.hierarchy-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--chart-1);
+}
+.hierarchy-list details > button {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(280px, 2fr) minmax(
+      130px,
+      auto
+    );
+  width: calc(100% - 22px);
+  margin-left: 22px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 7px;
+  text-align: left;
+}
+.hierarchy-list details > button small {
+  color: var(--muted);
+}
+.hierarchy-list details > button strong {
+  text-align: right;
+}
+.analytics-drill-row {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  justify-content: space-between;
+  text-align: left;
+}
+.legend i {
+  background: var(--chart-1);
+}
+.legend i:last-of-type {
+  background: var(--chart-2);
+}
+@media (max-width: 920px) {
+  .composition-bar-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .hierarchy-list details > button {
+    grid-template-columns: 1fr;
+  }
+  .hierarchy-list details > button strong {
+    text-align: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-mark:hover,
+  .chart-mark:focus,
+  .composition-bar-row:not(:disabled):hover {
+    transform: none;
+  }
+}
+
+:root[data-theme="dark"][data-palette="ocean"] {
+  --chart-1: #86bff2;
+  --chart-2: #6ed3d1;
+  --chart-3: #aab0f4;
+  --chart-4: #efb46f;
+  --chart-5: #e99ab4;
+  --chart-6: #8cc7dc;
+  --chart-7: #a8c986;
+  --chart-8: #bea6dc;
+}
+:root[data-theme="dark"][data-palette="violet"] {
+  --chart-1: #c0a3ed;
+  --chart-2: #e994ba;
+  --chart-3: #8ebbe7;
+  --chart-4: #eeb476;
+  --chart-5: #87c8b5;
+  --chart-6: #d2a4df;
+  --chart-7: #b6c582;
+  --chart-8: #e39288;
+}
+:root[data-theme="dark"][data-palette="amber"] {
+  --chart-1: #e6bd78;
+  --chart-2: #ec8e7c;
+  --chart-3: #9ebddb;
+  --chart-4: #e2c264;
+  --chart-5: #c8a6dc;
+  --chart-6: #86c9b5;
+  --chart-7: #ccb18b;
+  --chart-8: #e69ab4;
+}
+:root[data-theme="dark"][data-palette="rose"] {
+  --chart-1: #e99cb9;
+  --chart-2: #f0ad86;
+  --chart-3: #aaa8e8;
+  --chart-4: #83c8c9;
+  --chart-5: #ed9690;
+  --chart-6: #97bfe0;
+  --chart-7: #b8c47d;
+  --chart-8: #cda1d0;
+}
+:root[data-theme="dark"][data-palette="slate"] {
+  --chart-1: #a9c3d5;
+  --chart-2: #dfa28e;
+  --chart-3: #b0b8d4;
+  --chart-4: #d2b777;
+  --chart-5: #cea0b4;
+  --chart-6: #91c5c4;
+  --chart-7: #aebd95;
+  --chart-8: #bea9ca;
+}

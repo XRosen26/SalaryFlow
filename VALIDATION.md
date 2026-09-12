@@ -1,4 +1,12 @@
-# 验证记录 · 0.6.2
+# 验证记录 · Windows 0.7.0 / Android 0.2.0
+
+## Windows 0.7.0 / Android 0.2.0验收 · 2026-09-12
+
+Windows：56项Node测试、TypeScript/Vite构建和完整Electron桌面流程通过。对0.7.0同次构建的解包程序复跑完整流程，覆盖真实SQLite、金额算式、七个页面、说明气泡、交易/预算排序、趋势直接标签及周期预算环形/条形图。安装版与便携版使用同一打包内容；便携自解压启动器不适合Playwright直接接管。
+
+Android：TypeScript通过，7项领域测试全部通过，新增工资分配零值保留金额回归。ARM64 Release完成576个Gradle任务，minSdk 24、target/compileSdk 36；本机ADB未连接真机或模拟器，因此本轮没有设备端点击验收。
+
+SHA-256：Windows安装版 `6284243658810BF32D95EB76A5852C2792747C1DD136C87359623D2EF90B9890`；Windows便携版 `BC0624AA15E65091EB2C9AFEF159F8391931EF17A78420625224F3345216667C`；Android APK `133473D08D2A64E689F47F1501CF30F611EBDD4B249C33B4802BEA605142BF5F`。发布清单不含数据库、备份或用户配置。
 
 ## 0.6.2金额计算、完整说明与双语显示验收 · 2026-09-12
 

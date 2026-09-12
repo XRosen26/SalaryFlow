@@ -10,7 +10,7 @@ schema仍为3，不改已发布SQL。余额保护和自定义分类创建在主�
 
 core/storage.mjs负责位置配置与迁移：父目录下创建SalaryFlow-data，Online Backup生成快照、验证后以排他创建方式复制ledger.sqlite，保留备份，再原子提交默认用户目录的location.json。重启后切换userData；原账本保留，不覆盖已有目标库。自选磁盘不可用时停止启动，不自动新建空账本。默认用户目录保留小型路径配置文件，应用缓存位于当前userData。清理缓存调用Electron session.clearCache，不删除账本或审计。
 
-版本：V1 已确认架构基线｜2026-09-06｜应用0.6.2已实现。实际采用Electron备选、Node SQLite、数据库schema 4；真实DDL与设计差异见 [IMPLEMENTATION.md](./IMPLEMENTATION.md)。下文候选模型保留用于设计追溯，不代表所有P1/P2表已实现。
+版本：V1 已确认架构基线｜2026-09-06｜Windows应用0.7.0、Android应用0.2.0已实现。实际采用Electron备选、Node SQLite、数据库schema 4；真实DDL与设计差异见 [IMPLEMENTATION.md](./IMPLEMENTATION.md)。下文候选模型保留用于设计追溯，不代表所有P1/P2表已实现。
 
 业务定义以 [PRD.md](./PRD.md) BR01—BR13 为准；页面见 [PRODUCT_DESIGN.md](./PRODUCT_DESIGN.md)。D20 技术选型、D02 范围及其他业务决策确认后才能冻结本模型。下文是可评审的数据字典与约束设计，不是已执行的 migration。
 

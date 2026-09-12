@@ -1,16 +1,360 @@
-import { useRouter } from 'expo-router';import { useMemo,useState } from 'react';import { Alert,Pressable,StyleSheet,Text,TextInput,View } from 'react-native';import { useSQLiteContext } from 'expo-sqlite';
-import { AppScreen,Card,LoadingState,MoneyAmount,PageHeader } from '@/components/ui';import { radius,spacing,useAppTheme } from '@/constants/theme';import { useFinance } from '@/data/finance-context';import { executeSalaryAllocation } from '@/data/repository';import { formatMoney,parseMoneyExpression } from '@/domain/money';
-type Cap='SALARY'|'BALANCE'|'CUSTOM';function Choice({label,active,onPress}:{label:string;active:boolean;onPress:()=>void}){const c=useAppTheme();return <Pressable onPress={onPress} style={[styles.choice,{borderColor:active?c.primary:c.border,backgroundColor:active?c.primarySoft:c.surface}]}><Text style={{color:active?c.primary:c.text,fontWeight:'800'}}>{label}</Text></Pressable>}
-export default function SalaryAllocationScreen(){const c=useAppTheme();const db=useSQLiteContext();const router=useRouter();const {snapshot,error,refresh}=useFinance();const salaries=snapshot?.transactions.filter(x=>x.kind==='INCOME'&&x.salary)??[];const [salaryId,setSalaryId]=useState(salaries[0]?.id??'');const [capMode,setCapMode]=useState<Cap>('SALARY');const [customCap,setCustomCap]=useState('');const [reserve,setReserve]=useState('0');const [spendingText,setSpendingText]=useState('');const [savingsText,setSavingsText]=useState('');const [calculated,setCalculated]=useState(false);const [busy,setBusy]=useState(false);
- const salary=salaries.find(x=>x.id===salaryId)??salaries[0];const source=snapshot?.accounts.find(x=>x.roles.includes('PRIMARY_SALARY'));const spending=snapshot?.accounts.find(x=>x.roles.includes('PRIMARY_SPENDING'));const savings=snapshot?.accounts.find(x=>x.roles.includes('PRIMARY_SAVINGS'));
- const basis=useMemo(()=>{if(!snapshot||!salary||!source)return null;let cap=capMode==='SALARY'?salary.amountMinor:capMode==='BALANCE'?source.balanceMinor:Number(parseMoneyExpression(customCap||'0'));const kept=Number(parseMoneyExpression(reserve||'0'));const available=Math.max(0,Math.min(cap,source.balanceMinor)-kept);const need=Math.max(0,snapshot.summary.remainingBudgetMinor-(spending?.balanceMinor??0));const toSpending=Math.min(available,need);return{cap,kept,available,need,toSpending,toSavings:available-toSpending}},[capMode,customCap,reserve,salary,snapshot,source,spending]);
- if(!snapshot)return <AppScreen><LoadingState error={error}/></AppScreen>;if(!salary||!source||!spending)return <AppScreen><PageHeader title="工资分配" subtitle="先记录一笔标记为工资的收入，并设置工资账户与主要消费账户。"/><Pressable onPress={()=>router.push('/add?kind=INCOME' as never)} style={[styles.save,{backgroundColor:c.primary}]}><Text style={styles.saveText}>去记录工资收入</Text></Pressable></AppScreen>;
- const calculate=()=>{try{if(!basis)throw new Error('请检查分配上限');setSpendingText((basis.toSpending/100).toFixed(2));setSavingsText((basis.toSavings/100).toFixed(2));setCalculated(true)}catch(e){Alert.alert('无法计算',e instanceof Error?e.message:'请检查输入')}};
- const execute=()=>{try{const spendingMinor=Number(parseMoneyExpression(spendingText));const savingsMinor=Number(parseMoneyExpression(savingsText||'0'));Alert.alert('确认开始分配',`将从“${source.name}”真实记录以下转账：\n\n至 ${spending.name}：${formatMoney(spendingMinor)}\n${savings?`至 ${savings.name}：${formatMoney(savingsMinor)}\n`:''}\n确认后账户余额会立即更新。`,[{text:'取消',style:'cancel'},{text:'确认分配',onPress:async()=>{try{setBusy(true);await executeSalaryAllocation(db,{salaryId:salary.id,sourceId:source.id,spendingId:spending.id,savingsId:savings?.id,spendingMinor,savingsMinor,calculation:{capMode,capMinor:basis?.cap,reserveMinor:basis?.kept,remainingBudgetMinor:snapshot.summary.remainingBudgetMinor,spendingBalanceMinor:spending.balanceMinor}});await refresh();Alert.alert('工资已分配','真实转账已经记录，可在交易明细中查看。',[{text:'查看明细',onPress:()=>router.replace('/transactions' as never)}])}catch(e){Alert.alert('分配失败',e instanceof Error?e.message:'请检查账户余额')}finally{setBusy(false)}}}])}catch(e){Alert.alert('金额无效',e instanceof Error?e.message:'请检查输入')}};
- return <AppScreen><PageHeader title="工资分配" subtitle="先计算建议，确认后才会生成真实账户转账。"/>
- <Card style={styles.card}><Text style={[styles.title,{color:c.text}]}>1. 选择本次工资</Text><View style={styles.wrap}>{salaries.slice(0,6).map(x=><Choice key={x.id} label={`${x.date} · ${formatMoney(x.amountMinor)}`} active={salary.id===x.id} onPress={()=>{setSalaryId(x.id);setCalculated(false)}}/>)}</View><Text style={[styles.help,{color:c.textSecondary}]}>工资金额取自所选收入记录；下个周期选择新工资后会自动变化。</Text></Card>
- <Card style={styles.card}><Text style={[styles.title,{color:c.text}]}>2. 确定可分配上限</Text><View style={styles.wrap}><Choice label="本次工资金额" active={capMode==='SALARY'} onPress={()=>setCapMode('SALARY')}/><Choice label="工资账户总余额" active={capMode==='BALANCE'} onPress={()=>setCapMode('BALANCE')}/><Choice label="其他金额" active={capMode==='CUSTOM'} onPress={()=>setCapMode('CUSTOM')}/></View>{capMode==='CUSTOM'?<TextInput value={customCap} onChangeText={setCustomCap} placeholder="自定义上限，可输入算式" style={[styles.input,{color:c.text,borderColor:c.border}]}/>:null}<Text style={[styles.help,{color:c.textSecondary}]}>工资账户当前余额：{formatMoney(source.balanceMinor)}</Text><TextInput value={reserve} onChangeText={setReserve} placeholder="工资账户保留金额" style={[styles.input,{color:c.text,borderColor:c.border}]}/><Pressable onPress={calculate} style={[styles.save,{backgroundColor:c.primary}]}><Text style={styles.saveText}>计算分配建议</Text></Pressable></Card>
- {calculated&&basis?<Card style={styles.card}><Text style={[styles.title,{color:c.text}]}>3. 分配建议</Text><Text style={[styles.help,{color:c.textSecondary}]}>计算依据：先用主要消费账户余额补足本期剩余预算；可分配资金的其余部分进入主要储蓄账户。预算是计划额度，账户余额是真实资金。</Text><Row label="本次分配上限" value={basis.cap}/><Row label="工资账户保留" value={basis.kept}/><Row label="当前消费账户余额" value={spending.balanceMinor}/><Row label="本期剩余预算" value={snapshot.summary.remainingBudgetMinor}/><Row label="建议补充消费账户" value={basis.toSpending}/><Row label="建议转入储蓄账户" value={basis.toSavings}/><Text style={[styles.title,{color:c.text}]}>确认前可调整</Text><TextInput value={spendingText} onChangeText={setSpendingText} placeholder="转入消费账户" style={[styles.input,{color:c.text,borderColor:c.border}]}/><TextInput value={savingsText} onChangeText={setSavingsText} placeholder="转入储蓄账户" style={[styles.input,{color:c.text,borderColor:c.border}]}/><Pressable disabled={busy} onPress={execute} style={[styles.save,{backgroundColor:c.primary,opacity:busy?.5:1}]}><Text style={styles.saveText}>{busy?'正在分配…':'确认并开始分配'}</Text></Pressable></Card>:null}
- </AppScreen>}
-function Row({label,value}:{label:string;value:number}){const c=useAppTheme();return <View style={styles.between}><Text style={[styles.help,{color:c.textSecondary}]}>{label}</Text><MoneyAmount value={value} size={15}/></View>}
-const styles=StyleSheet.create({card:{gap:spacing.md},title:{fontSize:17,fontWeight:'900'},help:{fontSize:12,lineHeight:19},wrap:{flexDirection:'row',flexWrap:'wrap',gap:spacing.sm},choice:{minHeight:44,borderWidth:1,borderRadius:radius.pill,paddingHorizontal:spacing.md,alignItems:'center',justifyContent:'center'},input:{minHeight:50,borderWidth:1,borderRadius:radius.md,paddingHorizontal:spacing.md,fontSize:15},save:{minHeight:52,borderRadius:radius.md,alignItems:'center',justifyContent:'center'},saveText:{color:'#fff',fontWeight:'900'},between:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:spacing.md}});
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useSQLiteContext } from "expo-sqlite";
+import {
+  AppScreen,
+  Card,
+  LoadingState,
+  MoneyAmount,
+  PageHeader,
+} from "@/components/ui";
+import { radius, spacing, useAppTheme } from "@/constants/theme";
+import { useFinance } from "@/data/finance-context";
+import { executeSalaryAllocation } from "@/data/repository";
+import { formatMoney, parseMoneyExpression } from "@/domain/money";
+type Cap = "SALARY" | "BALANCE" | "CUSTOM";
+function Choice({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const c = useAppTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.choice,
+        {
+          borderColor: active ? c.primary : c.border,
+          backgroundColor: active ? c.primarySoft : c.surface,
+        },
+      ]}
+    >
+      <Text style={{ color: active ? c.primary : c.text, fontWeight: "800" }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+export default function SalaryAllocationScreen() {
+  const c = useAppTheme();
+  const db = useSQLiteContext();
+  const router = useRouter();
+  const { snapshot, error, refresh } = useFinance();
+  const salaries =
+    snapshot?.transactions.filter((x) => x.kind === "INCOME" && x.salary) ?? [];
+  const [salaryId, setSalaryId] = useState(salaries[0]?.id ?? "");
+  const [capMode, setCapMode] = useState<Cap>("SALARY");
+  const [customCap, setCustomCap] = useState("");
+  const [reserve, setReserve] = useState("0");
+  const [spendingText, setSpendingText] = useState("");
+  const [savingsText, setSavingsText] = useState("");
+  const [calculated, setCalculated] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const salary = salaries.find((x) => x.id === salaryId) ?? salaries[0];
+  const source = snapshot?.accounts.find((x) =>
+    x.roles.includes("PRIMARY_SALARY"),
+  );
+  const spending = snapshot?.accounts.find((x) =>
+    x.roles.includes("PRIMARY_SPENDING"),
+  );
+  const savings = snapshot?.accounts.find((x) =>
+    x.roles.includes("PRIMARY_SAVINGS"),
+  );
+  const basis = useMemo(() => {
+    if (!snapshot || !salary || !source) return null;
+    try {
+      const cap =
+        capMode === "SALARY"
+          ? salary.amountMinor
+          : capMode === "BALANCE"
+            ? source.balanceMinor
+            : Number(parseMoneyExpression(customCap || "0"));
+      const kept = Number(parseMoneyExpression(reserve || "0", { zero: true }));
+      const available = Math.max(0, Math.min(cap, source.balanceMinor) - kept);
+      const need = Math.max(
+        0,
+        snapshot.summary.remainingBudgetMinor - (spending?.balanceMinor ?? 0),
+      );
+      const toSpending = Math.min(available, need);
+      return {
+        cap,
+        kept,
+        available,
+        need,
+        toSpending,
+        toSavings: available - toSpending,
+        error: "",
+      };
+    } catch (reason) {
+      return {
+        cap: 0,
+        kept: 0,
+        available: 0,
+        need: 0,
+        toSpending: 0,
+        toSavings: 0,
+        error: reason instanceof Error ? reason.message : "请检查分配金额",
+      };
+    }
+  }, [capMode, customCap, reserve, salary, snapshot, source, spending]);
+  if (!snapshot)
+    return (
+      <AppScreen>
+        <LoadingState error={error} />
+      </AppScreen>
+    );
+  if (!salary || !source || !spending)
+    return (
+      <AppScreen>
+        <PageHeader
+          title="工资分配"
+          subtitle="先记录一笔标记为工资的收入，并设置工资账户与主要消费账户。"
+        />
+        <Pressable
+          onPress={() => router.push("/add?kind=INCOME" as never)}
+          style={[styles.save, { backgroundColor: c.primary }]}
+        >
+          <Text style={styles.saveText}>去记录工资收入</Text>
+        </Pressable>
+      </AppScreen>
+    );
+  const calculate = () => {
+    try {
+      if (!basis || basis.error)
+        throw new Error(basis?.error || "请检查分配上限");
+      setSpendingText((basis.toSpending / 100).toFixed(2));
+      setSavingsText((basis.toSavings / 100).toFixed(2));
+      setCalculated(true);
+    } catch (e) {
+      Alert.alert("无法计算", e instanceof Error ? e.message : "请检查输入");
+    }
+  };
+  const execute = () => {
+    try {
+      const spendingMinor = Number(
+        parseMoneyExpression(spendingText, { zero: true }),
+      );
+      const savingsMinor = Number(
+        parseMoneyExpression(savingsText || "0", { zero: true }),
+      );
+      Alert.alert(
+        "确认开始分配",
+        `将从“${source.name}”真实记录以下转账：\n\n至 ${spending.name}：${formatMoney(spendingMinor)}\n${savings ? `至 ${savings.name}：${formatMoney(savingsMinor)}\n` : ""}\n确认后账户余额会立即更新。`,
+        [
+          { text: "取消", style: "cancel" },
+          {
+            text: "确认分配",
+            onPress: async () => {
+              try {
+                setBusy(true);
+                await executeSalaryAllocation(db, {
+                  salaryId: salary.id,
+                  sourceId: source.id,
+                  spendingId: spending.id,
+                  savingsId: savings?.id,
+                  spendingMinor,
+                  savingsMinor,
+                  calculation: {
+                    capMode,
+                    capMinor: basis?.cap,
+                    reserveMinor: basis?.kept,
+                    remainingBudgetMinor: snapshot.summary.remainingBudgetMinor,
+                    spendingBalanceMinor: spending.balanceMinor,
+                  },
+                });
+                await refresh();
+                Alert.alert(
+                  "工资已分配",
+                  "真实转账已经记录，可在交易明细中查看。",
+                  [
+                    {
+                      text: "查看明细",
+                      onPress: () => router.replace("/transactions" as never),
+                    },
+                  ],
+                );
+              } catch (e) {
+                Alert.alert(
+                  "分配失败",
+                  e instanceof Error ? e.message : "请检查账户余额",
+                );
+              } finally {
+                setBusy(false);
+              }
+            },
+          },
+        ],
+      );
+    } catch (e) {
+      Alert.alert("金额无效", e instanceof Error ? e.message : "请检查输入");
+    }
+  };
+  return (
+    <AppScreen>
+      <PageHeader
+        title="工资分配"
+        subtitle="先计算建议，确认后才会生成真实账户转账。"
+      />
+      <Card style={styles.card}>
+        <Text style={[styles.title, { color: c.text }]}>1. 选择本次工资</Text>
+        <View style={styles.wrap}>
+          {salaries.slice(0, 6).map((x) => (
+            <Choice
+              key={x.id}
+              label={`${x.date} · ${formatMoney(x.amountMinor)}`}
+              active={salary.id === x.id}
+              onPress={() => {
+                setSalaryId(x.id);
+                setCalculated(false);
+              }}
+            />
+          ))}
+        </View>
+        <Text style={[styles.help, { color: c.textSecondary }]}>
+          工资金额取自所选收入记录；下个周期选择新工资后会自动变化。
+        </Text>
+      </Card>
+      <Card style={styles.card}>
+        <Text style={[styles.title, { color: c.text }]}>2. 确定可分配上限</Text>
+        <View style={styles.wrap}>
+          <Choice
+            label="本次工资金额"
+            active={capMode === "SALARY"}
+            onPress={() => setCapMode("SALARY")}
+          />
+          <Choice
+            label="工资账户总余额"
+            active={capMode === "BALANCE"}
+            onPress={() => setCapMode("BALANCE")}
+          />
+          <Choice
+            label="其他金额"
+            active={capMode === "CUSTOM"}
+            onPress={() => setCapMode("CUSTOM")}
+          />
+        </View>
+        {capMode === "CUSTOM" ? (
+          <TextInput
+            value={customCap}
+            onChangeText={setCustomCap}
+            placeholder="自定义上限，可输入算式"
+            style={[styles.input, { color: c.text, borderColor: c.border }]}
+          />
+        ) : null}
+        <Text style={[styles.help, { color: c.textSecondary }]}>
+          工资账户当前余额：{formatMoney(source.balanceMinor)}
+        </Text>
+        <TextInput
+          value={reserve}
+          onChangeText={setReserve}
+          placeholder="工资账户保留金额"
+          style={[styles.input, { color: c.text, borderColor: c.border }]}
+        />
+        <Pressable
+          onPress={calculate}
+          style={[styles.save, { backgroundColor: c.primary }]}
+        >
+          <Text style={styles.saveText}>计算分配建议</Text>
+        </Pressable>
+      </Card>
+      {calculated && basis && !basis.error ? (
+        <Card style={styles.card}>
+          <Text style={[styles.title, { color: c.text }]}>3. 分配建议</Text>
+          <Text style={[styles.help, { color: c.textSecondary }]}>
+            计算依据：先用主要消费账户余额补足本期剩余预算；可分配资金的其余部分进入主要储蓄账户。预算是计划额度，账户余额是真实资金。
+          </Text>
+          <Row label="本次分配上限" value={basis.cap} />
+          <Row label="工资账户保留" value={basis.kept} />
+          <Row label="当前消费账户余额" value={spending.balanceMinor} />
+          <Row
+            label="本期剩余预算"
+            value={snapshot.summary.remainingBudgetMinor}
+          />
+          <Row label="建议补充消费账户" value={basis.toSpending} />
+          <Row label="建议转入储蓄账户" value={basis.toSavings} />
+          <Text style={[styles.title, { color: c.text }]}>确认前可调整</Text>
+          <TextInput
+            value={spendingText}
+            onChangeText={setSpendingText}
+            placeholder="转入消费账户"
+            style={[styles.input, { color: c.text, borderColor: c.border }]}
+          />
+          <TextInput
+            value={savingsText}
+            onChangeText={setSavingsText}
+            placeholder="转入储蓄账户"
+            style={[styles.input, { color: c.text, borderColor: c.border }]}
+          />
+          <Pressable
+            disabled={busy}
+            onPress={execute}
+            style={[
+              styles.save,
+              { backgroundColor: c.primary, opacity: busy ? 0.5 : 1 },
+            ]}
+          >
+            <Text style={styles.saveText}>
+              {busy ? "正在分配…" : "确认并开始分配"}
+            </Text>
+          </Pressable>
+        </Card>
+      ) : null}
+    </AppScreen>
+  );
+}
+function Row({ label, value }: { label: string; value: number }) {
+  const c = useAppTheme();
+  return (
+    <View style={styles.between}>
+      <Text style={[styles.help, { color: c.textSecondary }]}>{label}</Text>
+      <MoneyAmount value={value} size={15} />
+    </View>
+  );
+}
+const styles = StyleSheet.create({
+  card: { gap: spacing.md },
+  title: { fontSize: 17, fontWeight: "900" },
+  help: { fontSize: 12, lineHeight: 19 },
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  choice: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  input: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    fontSize: 15,
+  },
+  save: {
+    minHeight: 52,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveText: { color: "#fff", fontWeight: "900" },
+  between: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+});

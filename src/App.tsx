@@ -1,4 +1,4 @@
-import { Trend, Composition } from "./Charts";
+import { Trend, Composition, CategoryHierarchy } from "./Charts";
 import { t as msg, tr, getLocale, changeLocale } from "./i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -494,7 +494,10 @@ export default function App() {
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
-    [settingsTab, setSettingsTab] = useState("general");
+    [settingsTab, setSettingsTab] = useState("general"),
+    [budgetSort, setBudgetSort] = useState("default"),
+    [expenseSort, setExpenseSort] = useState("amount_desc"),
+    [incomeSort, setIncomeSort] = useState("amount_desc");
   const [range, setRange] = useState("cycle"),
     [anchor, setAnchor] = useState(""),
     [custom, setCustom] = useState({ start: "", end: "" });
@@ -2039,6 +2042,21 @@ export default function App() {
                       </option>
                     ))}
                   </select>
+                  <select
+                    aria-label={msg("交易排序")}
+                    title={msg("交易排序")}
+                    value={query.sort || "date_desc"}
+                    onChange={(e) =>
+                      setQuery({ ...query, sort: e.target.value, page: 0 })
+                    }
+                  >
+                    <option value="date_desc">{msg("日期从新到旧")}</option>
+                    <option value="date_asc">{msg("日期从旧到新")}</option>
+                    <option value="amount_desc">{msg("金额从高到低")}</option>
+                    <option value="amount_asc">{msg("金额从低到高")}</option>
+                    <option value="category_asc">{msg("分类名称正序")}</option>
+                    <option value="category_desc">{msg("分类名称倒序")}</option>
+                  </select>
                   <button
                     className={query.deleted ? "danger" : ""}
                     onClick={() =>
@@ -2348,6 +2366,26 @@ export default function App() {
                 ))}
               </div>
               <section className="panel">
+                <div className="panel-heading compact-heading">
+                  <div>
+                    <h3>{msg("本周期预算明细")}</h3>
+                    <p>{msg("排序只改变显示顺序，不改变预算计算。")}</p>
+                  </div>
+                  <select
+                    aria-label={msg("预算排序")}
+                    value={budgetSort}
+                    onChange={(e) => setBudgetSort(e.target.value)}
+                  >
+                    <option value="default">{msg("默认顺序")}</option>
+                    <option value="budget_desc">{msg("预算从高到低")}</option>
+                    <option value="budget_asc">{msg("预算从低到高")}</option>
+                    <option value="actual_desc">{msg("实际从高到低")}</option>
+                    <option value="actual_asc">{msg("实际从低到高")}</option>
+                    <option value="rate_desc">{msg("执行率从高到低")}</option>
+                    <option value="rate_asc">{msg("执行率从低到高")}</option>
+                    <option value="name_asc">{msg("分类名称正序")}</option>
+                  </select>
+                </div>
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -2361,47 +2399,80 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.budgetRows.map((b: Data) => (
-                        <tr
-                          key={b.category_id}
-                          onClick={() =>
-                            goto("transactions", {
-                              cycle_id: data.cycle.id,
-                              category_id: b.category_id,
-                            })
-                          }
-                        >
-                          <td>
-                            <strong>{b.name}</strong>
-                            <small className="block muted">{b.group}</small>
-                          </td>
-                          <td className="align-right money">{fmt(b.budget)}</td>
-                          <td className="align-right money">{fmt(b.actual)}</td>
-                          <td
-                            className={
-                              "align-right money " +
-                              (BigInt(b.remaining) < 0n ? "negative" : "")
+                      {[...data.budgetRows]
+                        .sort((a: Data, b: Data) => {
+                          if (budgetSort === "default") return 0;
+                          if (budgetSort === "name_asc")
+                            return localized(a.name).localeCompare(
+                              localized(b.name),
+                              getLocale(),
+                            );
+                          const [key, direction] = budgetSort.split("_");
+                          const av =
+                            key === "rate"
+                              ? BigInt(Math.round(Number(a.rate ?? -1) * 100))
+                              : BigInt(a[key] ?? 0);
+                          const bv =
+                            key === "rate"
+                              ? BigInt(Math.round(Number(b.rate ?? -1) * 100))
+                              : BigInt(b[key] ?? 0);
+                          return av === bv
+                            ? 0
+                            : av > bv
+                              ? direction === "desc"
+                                ? -1
+                                : 1
+                              : direction === "desc"
+                                ? 1
+                                : -1;
+                        })
+                        .map((b: Data) => (
+                          <tr
+                            key={b.category_id}
+                            onClick={() =>
+                              goto("transactions", {
+                                cycle_id: data.cycle.id,
+                                category_id: b.category_id,
+                              })
                             }
                           >
-                            <span
-                              style={{ color: budgetColor(b.actual, b.budget) }}
-                            >
-                              {fmt(b.remaining)}
-                            </span>
-                          </td>
-                          <td>{b.rate === null ? "—" : b.rate + "%"}</td>
-                          <td>
-                            <span
+                            <td>
+                              <strong>{b.name}</strong>
+                              <small className="block muted">{b.group}</small>
+                            </td>
+                            <td className="align-right money">
+                              {fmt(b.budget)}
+                            </td>
+                            <td className="align-right money">
+                              {fmt(b.actual)}
+                            </td>
+                            <td
                               className={
-                                "tag " +
-                                (b.state === "超出预算" ? "warn" : "neutral")
+                                "align-right money " +
+                                (BigInt(b.remaining) < 0n ? "negative" : "")
                               }
                             >
-                              {msg(b.state)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                              <span
+                                style={{
+                                  color: budgetColor(b.actual, b.budget),
+                                }}
+                              >
+                                {fmt(b.remaining)}
+                              </span>
+                            </td>
+                            <td>{b.rate === null ? "—" : b.rate + "%"}</td>
+                            <td>
+                              <span
+                                className={
+                                  "tag " +
+                                  (b.state === "超出预算" ? "warn" : "neutral")
+                                }
+                              >
+                                {msg(b.state)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -2879,12 +2950,22 @@ export default function App() {
               <Composition
                 report={data.report}
                 accounts={data.accounts}
+                budgetRows={data.budgetRows}
+                cycleLabel={
+                  data.cycle.start + " — " + addDays(data.cycle.end, -1)
+                }
                 hidden={!canShowAmount()}
-                onCategory={(id) =>
+                onCategory={(id, dimension) =>
                   goto("transactions", {
-                    start: data.report.start,
-                    end: data.report.end,
-                    category_version_id: id,
+                    start:
+                      dimension === "budget"
+                        ? data.cycle.start
+                        : data.report.start,
+                    end:
+                      dimension === "budget" ? data.cycle.end : data.report.end,
+                    ...(dimension === "budget"
+                      ? { category_id: id }
+                      : { category_version_id: id }),
                   })
                 }
               />
@@ -2916,12 +2997,39 @@ export default function App() {
                       <h3>{msg("支出构成")}</h3>
                       <p>{msg("毛支出占比 · 退款单独列示")}</p>
                     </div>
+                    <select
+                      aria-label={msg("支出构成排序")}
+                      value={expenseSort}
+                      onChange={(e) => setExpenseSort(e.target.value)}
+                    >
+                      <option value="amount_desc">{msg("金额从高到低")}</option>
+                      <option value="amount_asc">{msg("金额从低到高")}</option>
+                      <option value="name_asc">{msg("分类名称正序")}</option>
+                      <option value="name_desc">{msg("分类名称倒序")}</option>
+                    </select>
                   </div>
                   <div className="category-bars">
                     {[...data.report.groups]
-                      .sort((a, b) =>
-                        Number(BigInt(b.expense) - BigInt(a.expense)),
-                      )
+                      .sort((a, b) => {
+                        if (expenseSort.startsWith("name"))
+                          return (
+                            localized(a.name).localeCompare(
+                              localized(b.name),
+                              getLocale(),
+                            ) * (expenseSort.endsWith("desc") ? -1 : 1)
+                          );
+                        const av = BigInt(a.expense);
+                        const bv = BigInt(b.expense);
+                        return av === bv
+                          ? 0
+                          : av > bv
+                            ? expenseSort.endsWith("desc")
+                              ? -1
+                              : 1
+                            : expenseSort.endsWith("desc")
+                              ? 1
+                              : -1;
+                      })
                       .slice(0, 7)
                       .map((g: Data) => (
                         <button
@@ -3003,18 +3111,73 @@ export default function App() {
                   </table>
                 </section>
                 <section className="panel analysis-extra">
-                  <h3>{msg("收入结构")}</h3>
-                  {(data.report.incomeGroups || []).map((g: Data) => (
-                    <div className="setting-row" key={g.id}>
-                      <span>{g.name}</span>
-                      <strong>¥ {fmt(g.amount)}</strong>
-                    </div>
-                  ))}
+                  <div className="panel-heading compact-heading">
+                    <h3>{msg("收入结构")}</h3>
+                    <select
+                      aria-label={msg("收入结构排序")}
+                      value={incomeSort}
+                      onChange={(e) => setIncomeSort(e.target.value)}
+                    >
+                      <option value="amount_desc">{msg("金额从高到低")}</option>
+                      <option value="amount_asc">{msg("金额从低到高")}</option>
+                      <option value="name_asc">{msg("分类名称正序")}</option>
+                      <option value="name_desc">{msg("分类名称倒序")}</option>
+                    </select>
+                  </div>
+                  {[...(data.report.incomeGroups || [])]
+                    .sort((a: Data, b: Data) => {
+                      if (incomeSort.startsWith("name"))
+                        return (
+                          localized(a.name).localeCompare(
+                            localized(b.name),
+                            getLocale(),
+                          ) * (incomeSort.endsWith("desc") ? -1 : 1)
+                        );
+                      const av = BigInt(a.amount);
+                      const bv = BigInt(b.amount);
+                      return av === bv
+                        ? 0
+                        : av > bv
+                          ? incomeSort.endsWith("desc")
+                            ? -1
+                            : 1
+                          : incomeSort.endsWith("desc")
+                            ? 1
+                            : -1;
+                    })
+                    .map((g: Data) => (
+                      <button
+                        className="setting-row analytics-drill-row"
+                        key={g.id}
+                        onClick={() =>
+                          goto("transactions", {
+                            start: data.report.start,
+                            end: data.report.end,
+                            category_version_id: g.id,
+                          })
+                        }
+                      >
+                        <span>{g.name}</span>
+                        <strong>¥ {fmt(g.amount)}</strong>
+                      </button>
+                    ))}
                   {!data.report.incomeGroups?.length && (
                     <Empty title={msg("本范围暂无收入")} />
                   )}
                 </section>
               </div>
+              <CategoryHierarchy
+                groups={data.report.groups}
+                totalExpense={data.report.expense}
+                hidden={!canShowAmount()}
+                onCategory={(id) =>
+                  goto("transactions", {
+                    start: data.report.start,
+                    end: data.report.end,
+                    category_version_id: id,
+                  })
+                }
+              />
               <section className="panel">
                 <div className="panel-heading">
                   <h3>{msg("分类明细")}</h3>
@@ -3308,7 +3471,7 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.6.2 · 本地个人预算、现金流与理财资产",
+                          "SalaryFlow 0.7.0 · 本地个人预算、现金流与理财资产",
                         )}
                       </p>
                       <p>
