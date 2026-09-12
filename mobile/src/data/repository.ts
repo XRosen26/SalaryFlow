@@ -18,6 +18,7 @@ export type Settings = {
   payday: number;
   amountsVisible: boolean;
   accountSummaryVisible: boolean;
+  palette: "forest" | "ocean" | "violet" | "amber" | "rose" | "slate";
   onboardingComplete: boolean;
 };
 
@@ -99,6 +100,7 @@ const defaultSettings: Settings = {
   payday: 10,
   amountsVisible: true,
   accountSummaryVisible: true,
+  palette: "forest",
   onboardingComplete: false,
 };
 

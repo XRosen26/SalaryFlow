@@ -7,19 +7,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $mobileRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-$resolvedBuild = Join-Path 'C:\' ('sfa-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-New-Item -ItemType Directory -Path $resolvedBuild | Out-Null
+$androidRoot = Join-Path $mobileRoot 'android'
 
-$excluded = @('node_modules', 'android', 'ios', '.expo', '.expo-export-check', 'release')
-Get-ChildItem -LiteralPath $mobileRoot -Force | Where-Object { $excluded -notcontains $_.Name } | ForEach-Object {
-  Copy-Item -LiteralPath $_.FullName -Destination $resolvedBuild -Recurse -Force
-}
-
-Push-Location $resolvedBuild
+Push-Location $mobileRoot
 try {
-  & npm.cmd ci
-  if ($LASTEXITCODE -ne 0) { throw 'npm ci 失败' }
-
   $env:NODE_ENV = 'production'
   & npx.cmd expo prebuild --platform android --clean --no-install
   if ($LASTEXITCODE -ne 0) { throw 'Expo Android 预构建失败' }
@@ -42,7 +33,7 @@ try {
   $env:ANDROID_HOME = $androidSdk
   $env:ANDROID_SDK_ROOT = $androidSdk
 
-  Push-Location (Join-Path $resolvedBuild 'android')
+  Push-Location $androidRoot
   try {
     $gradleTask = 'assemble' + $Configuration
     & .\gradlew.bat $gradleTask "-PreactNativeArchitectures=$Architecture" --no-parallel --max-workers=1
@@ -52,12 +43,12 @@ try {
   }
 
   $variant = $Configuration.ToLowerInvariant()
-  $builtApk = Join-Path $resolvedBuild "android\app\build\outputs\apk\$variant\app-$variant.apk"
+  $builtApk = Join-Path $androidRoot "app\build\outputs\apk\$variant\app-$variant.apk"
   if (-not (Test-Path -LiteralPath $builtApk)) { throw "未找到构建产物：$builtApk" }
   $releaseRoot = Join-Path $mobileRoot 'release'
   New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
   Get-ChildItem -LiteralPath $releaseRoot -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.apk', '.sha256' } | Remove-Item -Force
-  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-0.2.0-preview-$Architecture.apk"
+  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-0.3.0-preview-$Architecture.apk"
   Copy-Item -LiteralPath $builtApk -Destination $outputApk -Force
   $hash = (Get-FileHash -LiteralPath $outputApk -Algorithm SHA256).Hash
   "$hash  $(Split-Path -Leaf $outputApk)" | Set-Content -LiteralPath "$outputApk.sha256" -Encoding ascii

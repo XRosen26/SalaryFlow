@@ -1,0 +1,4 @@
+{
+  "android": { "app_name": "SalaryFlow" },
+  "ios": { "CFBundleDisplayName": "SalaryFlow" }
+}

@@ -854,5 +854,7 @@
   "执行率从高到低": "Usage rate: high to low",
   "执行率从低到高": "Usage rate: low to high",
   "支出构成排序": "Spending composition sort",
-  "收入结构排序": "Income composition sort"
+  "收入结构排序": "Income composition sort",
+  "SalaryFlow 0.7.1 · Windows 与 Android 本地个人预算、现金流和资产管理": "SalaryFlow 0.7.1 · Local budgeting, cash flow, and asset management for Windows and Android",
+  "当前提供 Windows 桌面端与 Android 端，并分别针对大屏和触屏优化；数据保持本地，未来平台继续沿用一致的财务口径。": "Available for Windows and Android, with interfaces tailored to desktop and touch. Data stays local, and future platforms will follow the same financial rules."
 }

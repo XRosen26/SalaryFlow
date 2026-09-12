@@ -21,10 +21,15 @@ import {
   PageHeader,
   Pill,
 } from "@/components/ui";
-import { radius, spacing, useAppTheme } from "@/constants/theme";
+import {
+  radius,
+  spacing,
+  useAppTheme,
+  type PaletteName,
+} from "@/constants/theme";
 import { inspectBackup, restoreBackup, shareBackup } from "@/data/backup";
 import { useFinance } from "@/data/finance-context";
-import { resetLedger } from "@/data/repository";
+import { resetLedger, updateSettings } from "@/data/repository";
 
 function SettingRow({
   icon,
@@ -74,6 +79,19 @@ function SettingRow({
   );
 }
 
+const paletteOptions: {
+  id: PaletteName;
+  name: string;
+  description: string;
+  color: string;
+}[] = [
+  { id: "forest", name: "森绿", description: "沉静自然", color: "#176B55" },
+  { id: "ocean", name: "海蓝", description: "清晰冷静", color: "#2563A2" },
+  { id: "violet", name: "鸢紫", description: "柔和雅致", color: "#7253A6" },
+  { id: "amber", name: "暖琥珀", description: "温暖克制", color: "#99621E" },
+  { id: "rose", name: "玫瑰", description: "温润明快", color: "#A4476C" },
+  { id: "slate", name: "石墨", description: "低调中性", color: "#546775" },
+];
 export default function SettingsScreen() {
   const colors = useAppTheme();
   const router = useRouter();
@@ -235,6 +253,75 @@ export default function SettingsScreen() {
 
       <View>
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+          外观
+        </Text>
+        <Card style={styles.paletteCard}>
+          <Text style={[styles.rowTitle, { color: colors.text }]}>
+            界面配色
+          </Text>
+          <Text
+            style={[styles.rowDescription, { color: colors.textSecondary }]}
+          >
+            选择后立即应用；每套配色分别适配浅色与深色模式，预算风险色保持独立。
+          </Text>
+          <View accessibilityRole="radiogroup" style={styles.paletteGrid}>
+            {paletteOptions.map((item) => {
+              const selected = snapshot.settings.palette === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() =>
+                    void (async () => {
+                      await updateSettings(db, { palette: item.id });
+                      await refresh();
+                    })()
+                  }
+                  style={[
+                    styles.paletteChoice,
+                    {
+                      borderColor: selected ? colors.primary : colors.border,
+                      backgroundColor: selected
+                        ? colors.primarySoft
+                        : colors.surface,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.paletteSwatch,
+                      { backgroundColor: item.color },
+                    ]}
+                  />
+                  <View style={styles.paletteText}>
+                    <Text style={[styles.paletteName, { color: colors.text }]}>
+                      {item.name}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.paletteDescription,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {item.description}
+                    </Text>
+                  </View>
+                  {selected ? (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color={colors.primary}
+                    />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+      </View>
+      <View>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
           隐私
         </Text>
         <Card style={styles.group}>
@@ -349,12 +436,13 @@ export default function SettingsScreen() {
             <Text
               style={[styles.rowDescription, { color: colors.textSecondary }]}
             >
-              Android 0.2.0 · 本地个人现金流管理
+              Android 0.3.0 · 本地优先个人现金流管理
             </Text>
           </View>
-          <Pill text="MVP 预览" color={colors.info} />
+          <Pill text="Android" color={colors.info} />
           <Text style={[styles.aboutBody, { color: colors.textSecondary }]}>
-            由 XRosen26 使用 Codex 完成产品设计与开发。
+            薪流由 XRosen26 使用 Codex 完成并持续迭代。当前提供 Windows 与
+            Android 版本，分别针对大屏和触屏优化；未来平台将沿用一致的财务口径。
           </Text>
         </Card>
       </View>
@@ -387,6 +475,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   group: { padding: 0, overflow: "hidden" },
+  paletteCard: { gap: spacing.md },
+  paletteGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  paletteChoice: {
+    width: "48%",
+    minHeight: 68,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  paletteSwatch: { width: 28, height: 28, borderRadius: 9 },
+  paletteText: { flex: 1, gap: 2 },
+  paletteName: { fontSize: 14, fontWeight: "800" },
+  paletteDescription: { fontSize: 10 },
   row: {
     minHeight: 76,
     padding: spacing.lg,

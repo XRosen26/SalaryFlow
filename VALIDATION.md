@@ -1,4 +1,12 @@
-# 验证记录 · Windows 0.7.0 / Android 0.2.0
+# 验证记录 · Windows 0.7.1 / Android 0.3.0
+
+## Windows 0.7.1 / Android 0.3.0验收 · 2026-09-13
+
+Windows：56项Node财务与可靠性测试全部通过，TypeScript/Vite生产构建通过；源码Electron和0.7.1解包程序分别完成完整桌面流程验收。覆盖六套配色与浅/深主题圆环实色、收入与净支出构成、周期预算图、趋势标签、排序、交易、账户、工资分配和设置流程。桌面验收使用 `.local` 隔离账本，结束后清理。
+
+Android：Expo SDK 57公开配置解析通过，TypeScript和7项领域测试全部通过。ARM64 Release执行576个Gradle任务并通过Lint Vital、资源优化和V2签名；APK为versionName 0.3.0、versionCode 3、minSdk 24、target/compileSdk 36。`aapt`确认中文简体标签为“薪流”、默认及英文为“SalaryFlow”，仅含震动权限及Android自动生成的应用内部接收器权限。APK清单未发现SQLite、数据库、备份或用户目录文件。本轮未连接真实手机或模拟器，因此触屏流程仍需真机试用。
+
+发布物：Windows安装版 `074935F37D5B7D7FB254D8EB8BA0F6DD3BBA9A0902B9760782AD25A092C874FC`；Windows便携版 `8D91B2C66537B3C1244FF2BFFA243C7C1CC83E63A7827823952FA23E686833DC`；Android APK `0B8391BDB3C1356306C0CFFF812E903F47EC2C68F61EEF2322C92A344A35E626`。本地发布目录只保留当前版本、Android独立校验文件和总SHA-256清单。
 
 ## Windows 0.7.0 / Android 0.2.0验收 · 2026-09-12
 

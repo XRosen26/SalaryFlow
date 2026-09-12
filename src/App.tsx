@@ -3471,12 +3471,12 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.7.0 · 本地个人预算、现金流与理财资产",
+                          "SalaryFlow 0.7.1 · Windows 与 Android 本地个人预算、现金流和资产管理",
                         )}
                       </p>
                       <p>
                         {msg(
-                          "支持人民币资产账户、工资周期/自然月预算及理财估值；信用卡负债、多币种、银行直连和云同步尚未实现。",
+                          "当前提供 Windows 桌面端与 Android 端，并分别针对大屏和触屏优化；数据保持本地，未来平台继续沿用一致的财务口径。",
                         )}
                       </p>
                     </div>

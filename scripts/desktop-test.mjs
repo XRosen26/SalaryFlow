@@ -149,6 +149,64 @@ try {
         (await page.locator(".donut-slice-label").count()) > 0,
         "环形图没有直接占比标签",
       );
+      const paletteStrokes = [];
+      for (const palette of [
+        "forest",
+        "ocean",
+        "violet",
+        "amber",
+        "rose",
+        "slate",
+      ]) {
+        const rendered = await page.evaluate((nextPalette) => {
+          document.documentElement.dataset.palette = nextPalette;
+          document.documentElement.dataset.theme = "light";
+          const segment = document.querySelector(".donut-segment");
+          const track = document.querySelector(
+            ".composition-panel svg circle:not(.donut-segment)",
+          );
+          return {
+            segment: segment ? getComputedStyle(segment).fill : "missing",
+            track: track ? getComputedStyle(track).stroke : "missing",
+          };
+        }, palette);
+        assert.notEqual(rendered.segment, "none", `${palette}圆环填充颜色无效`);
+        assert.notEqual(
+          rendered.segment,
+          rendered.track,
+          `${palette}圆环仍未使用主题填充色`,
+        );
+        paletteStrokes.push(rendered.segment);
+      }
+      assert.equal(
+        new Set(paletteStrokes).size,
+        6,
+        "六套界面配色没有实时产生六种圆环主色",
+      );
+      const forestDark = await page.evaluate(() => {
+        document.documentElement.dataset.palette = "forest";
+        document.documentElement.dataset.theme = "dark";
+        const segment = document.querySelector(".donut-segment");
+        return segment ? getComputedStyle(segment).fill : "missing";
+      });
+      assert.notEqual(
+        forestDark,
+        paletteStrokes[0],
+        "深色主题没有调整圆环色板",
+      );
+      await page.evaluate(() => {
+        document.documentElement.dataset.palette = "forest";
+        document.documentElement.dataset.theme = "light";
+      });
+      await page.getByLabel("图表分析维度").selectOption("cashflow");
+      await page
+        .getByText("占比仅用于比较，不等于储蓄率", { exact: false })
+        .waitFor();
+      assert.equal(
+        await page.locator(".composition-panel .donut-legend button").count(),
+        2,
+        "收入与净支出构成应包含两个资金流",
+      );
       await page.getByLabel("图表分析维度").selectOption("budget");
       await page
         .getByText("预算分布绑定当前所选周期", { exact: false })
@@ -278,6 +336,8 @@ try {
           "交易与预算列表排序",
           "趋势金额与环形占比直接标签",
           "周期预算环形图和条形图",
+          "六套配色与浅深主题实时更新圆环色板",
+          "收入与净支出构成维度",
         ],
         dataDir: env.SALARYFLOW_DATA_DIR,
       },

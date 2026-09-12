@@ -18,6 +18,25 @@ const compact = (v: any, hidden = false) =>
         maximumFractionDigits: 1,
       }).format(Number(v) / 100);
 const colors = Array.from({ length: 8 }, (_, i) => `var(--chart-${i + 1})`);
+const pointOnCircle = (angle: number, radius: number) => ({
+  x: 140 + Math.cos(angle) * radius,
+  y: 135 + Math.sin(angle) * radius,
+});
+const donutPath = (offset: number, share: number) => {
+  const outer = 107;
+  const inner = 69;
+  if (share >= 0.999999) {
+    return "M 140 28 A 107 107 0 1 1 140 242 A 107 107 0 1 1 140 28 M 140 66 A 69 69 0 1 0 140 204 A 69 69 0 1 0 140 66";
+  }
+  const start = offset * Math.PI * 2 - Math.PI / 2;
+  const end = (offset + share) * Math.PI * 2 - Math.PI / 2;
+  const outerStart = pointOnCircle(start, outer);
+  const outerEnd = pointOnCircle(end, outer);
+  const innerEnd = pointOnCircle(end, inner);
+  const innerStart = pointOnCircle(start, inner);
+  const large = share > 0.5 ? 1 : 0;
+  return `M ${outerStart.x} ${outerStart.y} A ${outer} ${outer} 0 ${large} 1 ${outerEnd.x} ${outerEnd.y} L ${innerEnd.x} ${innerEnd.y} A ${inner} ${inner} 0 ${large} 0 ${innerStart.x} ${innerStart.y} Z`;
+};
 const byMoney = (a: Row, b: Row, key: string, desc = true) => {
   const av = BigInt(a[key] ?? 0);
   const bv = BigInt(b[key] ?? 0);
@@ -276,20 +295,33 @@ export function Composition({
         }))
       : dimension === "income"
         ? report.incomeGroups || []
-        : dimension === "budget"
-          ? budgetRows
-              .filter((b: Row) => BigInt(b.budget) > 0n)
-              .map((b: Row) => ({
-                id: b.category_id,
-                name: b.name,
-                amount: b.budget,
-                actual: b.actual,
-              }))
-          : accounts.map((a) => ({
-              id: a.id,
-              name: a.name,
-              amount: a.balance,
-            }));
+        : dimension === "cashflow"
+          ? [
+              {
+                id: "cashflow-income",
+                name: label("收入", "Income"),
+                amount: report.income,
+              },
+              {
+                id: "cashflow-expense",
+                name: label("净支出", "Net spending"),
+                amount: BigInt(report.net ?? 0) > 0n ? report.net : "0",
+              },
+            ]
+          : dimension === "budget"
+            ? budgetRows
+                .filter((b: Row) => BigInt(b.budget) > 0n)
+                .map((b: Row) => ({
+                  id: b.category_id,
+                  name: b.name,
+                  amount: b.budget,
+                  actual: b.actual,
+                }))
+            : accounts.map((a) => ({
+                id: a.id,
+                name: a.name,
+                amount: a.balance,
+              }));
   const chart = pieData(input, 9);
   const rows = [...chart.rows].sort((a, b) =>
     sort === "amount_asc"
@@ -321,20 +353,25 @@ export function Composition({
                   `预算分布绑定当前所选周期（${cycleLabel}）；实际支出仍按交易发生日期统计。`,
                   `Budget allocation is tied to the selected period (${cycleLabel}); actual spending still follows transaction dates.`,
                 )
-              : dimension === "assets"
+              : dimension === "cashflow"
                 ? label(
-                    "当前正余额账户占比，非所选期间的历史资产；负余额不进入图表。",
-                    "Current positive balances, not historical assets for the selected range. Negative balances are excluded.",
+                    "比较所选日期范围内收入与净支出的相对规模；占比仅用于比较，不等于储蓄率。",
+                    "Compares income with net spending in the selected dates. Shares show relative volume, not the savings rate.",
                   )
-                : dimension === "expense"
+                : dimension === "assets"
                   ? label(
-                      "按毛支出计算占比，退款单列；点击分类可查看交易明细。",
-                      "Shares use gross spending; refunds remain separate. Select a category to view transactions.",
+                      "当前正余额账户占比，非所选期间的历史资产；负余额不进入图表。",
+                      "Current positive balances, not historical assets for the selected range. Negative balances are excluded.",
                     )
-                  : label(
-                      "按所选日期范围的实际收入分类汇总。",
-                      "Income categories within the selected dates.",
-                    )}
+                  : dimension === "expense"
+                    ? label(
+                        "按毛支出计算占比，退款单列；点击分类可查看交易明细。",
+                        "Shares use gross spending; refunds remain separate. Select a category to view transactions.",
+                      )
+                    : label(
+                        "按所选日期范围的实际收入分类汇总。",
+                        "Income categories within the selected dates.",
+                      )}
           </p>
         </div>
         <div className="chart-controls">
@@ -348,6 +385,9 @@ export function Composition({
             </option>
             <option value="income">
               {label("收入来源", "Income sources")}
+            </option>
+            <option value="cashflow">
+              {label("收入与净支出", "Income vs. net spending")}
             </option>
             <option value="budget">
               {label("周期预算分布", "Period budget allocation")}
@@ -413,25 +453,17 @@ export function Composition({
               const ly = 135 + Math.sin(angle) * 89;
               return (
                 <g key={r.id}>
-                  <circle
-                    className="donut-segment"
-                    cx="140"
-                    cy="135"
-                    r="88"
-                    fill="none"
-                    stroke={colors[i % colors.length]}
-                    strokeWidth="38"
-                    pathLength="100"
-                    strokeDasharray={`${r.share * 100} ${100 - r.share * 100}`}
-                    strokeDashoffset={-o * 100}
-                    transform="rotate(-90 140 135)"
+                  <path
+                    className={`donut-segment chart-stroke-${(i % colors.length) + 1}`}
+                    d={donutPath(o, r.share)}
+                    fillRule="evenodd"
                     tabIndex={0}
                   >
                     <title>
                       {r.name || label("其他合计", "Other combined")} ·{" "}
                       {r.percent}% · ¥ {format(r.amount, hidden)}
                     </title>
-                  </circle>
+                  </path>
                   {r.share >= 0.075 && (
                     <text
                       x={lx}
@@ -446,7 +478,9 @@ export function Composition({
               );
             })}
             <text x="140" y="130" textAnchor="middle" className="donut-title">
-              {label("合计", "Total")}
+              {dimension === "cashflow"
+                ? label("收支规模", "Cash flow volume")
+                : label("合计", "Total")}
             </text>
             <text x="140" y="154" textAnchor="middle" className="donut-total">
               {format(chart.total, hidden)}

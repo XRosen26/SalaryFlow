@@ -2264,34 +2264,54 @@ html[lang="en"] .brand strong {
   --soft: #eaf0f3;
 }
 :root[data-theme="dark"][data-palette="ocean"] {
-  --accent: #89bafa;
-  --accent-hover: #bad6ff;
-  --bg: #141c28;
-  --soft: #26364b;
+  --chart-1: #83bcef;
+  --chart-2: #73c9ea;
+  --chart-3: #6fd2da;
+  --chart-4: #88d5bd;
+  --chart-5: #acd28b;
+  --chart-6: #e7be6f;
+  --chart-7: #ea927a;
+  --chart-8: #aaa3df;
 }
 :root[data-theme="dark"][data-palette="violet"] {
-  --accent: #bfa0eb;
-  --accent-hover: #dac5fa;
-  --bg: #201927;
-  --soft: #392b47;
+  --chart-1: #bea2eb;
+  --chart-2: #caa7ef;
+  --chart-3: #e09dce;
+  --chart-4: #ed9fbd;
+  --chart-5: #eeac8d;
+  --chart-6: #8db9e5;
+  --chart-7: #82c8b8;
+  --chart-8: #c5ce83;
 }
 :root[data-theme="dark"][data-palette="amber"] {
-  --accent: #e5bd79;
-  --accent-hover: #f4d7a5;
-  --bg: #221e16;
-  --soft: #403522;
+  --chart-1: #e5ba73;
+  --chart-2: #edc57c;
+  --chart-3: #f0d084;
+  --chart-4: #eadb9b;
+  --chart-5: #dda38a;
+  --chart-6: #9bbbd8;
+  --chart-7: #83c5b3;
+  --chart-8: #c4a6da;
 }
 :root[data-theme="dark"][data-palette="rose"] {
-  --accent: #eba4bf;
-  --accent-hover: #f6c8da;
-  --bg: #26191f;
-  --soft: #452b36;
+  --chart-1: #e99ab8;
+  --chart-2: #efa6bd;
+  --chart-3: #f2b0bc;
+  --chart-4: #efb39f;
+  --chart-5: #dca3d0;
+  --chart-6: #aaa6e6;
+  --chart-7: #82c5c6;
+  --chart-8: #afc781;
 }
 :root[data-theme="dark"][data-palette="slate"] {
-  --accent: #adbfce;
-  --accent-hover: #d1deea;
-  --bg: #181e24;
-  --soft: #2e3a45;
+  --chart-1: #a7c0d1;
+  --chart-2: #b5ccd8;
+  --chart-3: #c4d1d6;
+  --chart-4: #d0d2cf;
+  --chart-5: #d1ad99;
+  --chart-6: #df9b91;
+  --chart-7: #b9add3;
+  --chart-8: #a6c2aa;
 }
 :root[data-palette]:not([data-palette="forest"]) {
   --surface: color-mix(in srgb, var(--bg) 15%, white);
@@ -2646,75 +2666,81 @@ button.danger-button:hover {
 
 /* v0.7 analytics palette and interactions */
 :root {
-  --chart-1: #2f8069;
-  --chart-2: #c66c3c;
-  --chart-3: #6f72c9;
-  --chart-4: #d09d2d;
-  --chart-5: #b85078;
-  --chart-6: #4e8fb8;
-  --chart-7: #7b9851;
-  --chart-8: #8a6c9f;
-  --chart-label-on-color: #fff;
+  /* 森绿：松绿、青绿与苔绿为主，陶土橙提供柔和互补。 */
+  --chart-1: #287a60;
+  --chart-2: #4c9674;
+  --chart-3: #76a765;
+  --chart-4: #a1a657;
+  --chart-5: #cf9846;
+  --chart-6: #c96d52;
+  --chart-7: #4e8c94;
+  --chart-8: #736f9c;
+  --chart-label-on-color: #ffffff;
 }
 :root[data-palette="ocean"] {
-  --chart-1: #2c70ae;
-  --chart-2: #24a0a3;
-  --chart-3: #6b76cf;
-  --chart-4: #d18435;
-  --chart-5: #b9577b;
-  --chart-6: #508fa5;
-  --chart-7: #759b58;
-  --chart-8: #8a75ad;
+  /* 海蓝：深海蓝到湖青渐进，沙金和珊瑚形成暖色平衡。 */
+  --chart-1: #2d6fa7;
+  --chart-2: #3c8fbe;
+  --chart-3: #43a3b0;
+  --chart-4: #62b39f;
+  --chart-5: #8ab979;
+  --chart-6: #d0a14e;
+  --chart-7: #d2765c;
+  --chart-8: #7e78b3;
 }
 :root[data-palette="violet"] {
-  --chart-1: #7654ad;
-  --chart-2: #b95d87;
-  --chart-3: #4d83b8;
-  --chart-4: #d08b35;
-  --chart-5: #5b9c88;
-  --chart-6: #9b69ad;
-  --chart-7: #7c9250;
-  --chart-8: #b06055;
+  /* 鸢紫：紫、梅红与蓝紫渐进，青绿和暖杏作互补点缀。 */
+  --chart-1: #7253a6;
+  --chart-2: #8b64b3;
+  --chart-3: #aa70ae;
+  --chart-4: #c67698;
+  --chart-5: #d08769;
+  --chart-6: #5d87b2;
+  --chart-7: #4e9687;
+  --chart-8: #9da258;
 }
 :root[data-palette="amber"] {
-  --chart-1: #a26a22;
-  --chart-2: #c2513e;
-  --chart-3: #6485a5;
-  --chart-4: #c39524;
-  --chart-5: #8b6ba4;
-  --chart-6: #4f927f;
-  --chart-7: #9c7a4f;
-  --chart-8: #b65e79;
+  /* 暖琥珀：金棕与麦色为主，以雾蓝、青绿形成冷暖平衡。 */
+  --chart-1: #a56a20;
+  --chart-2: #bd812c;
+  --chart-3: #cf9d3f;
+  --chart-4: #d6b660;
+  --chart-5: #b37659;
+  --chart-6: #587fa1;
+  --chart-7: #4e8f80;
+  --chart-8: #846da1;
 }
 :root[data-palette="rose"] {
-  --chart-1: #aa486f;
-  --chart-2: #d0774d;
-  --chart-3: #726fbd;
-  --chart-4: #4c8f91;
-  --chart-5: #c25d57;
-  --chart-6: #5c89ae;
-  --chart-7: #87964d;
-  --chart-8: #98669c;
+  /* 玫瑰：莓红、玫瑰与暖粉为主，蓝紫、青绿补充层次。 */
+  --chart-1: #a84569;
+  --chart-2: #be5876;
+  --chart-3: #d17484;
+  --chart-4: #d48b77;
+  --chart-5: #b4679d;
+  --chart-6: #746fb7;
+  --chart-7: #4f8d8e;
+  --chart-8: #78945e;
 }
 :root[data-palette="slate"] {
-  --chart-1: #526f82;
-  --chart-2: #b2674f;
-  --chart-3: #6f7896;
-  --chart-4: #a88a42;
-  --chart-5: #925d72;
-  --chart-6: #4d8584;
-  --chart-7: #73835d;
-  --chart-8: #7f6d8c;
+  /* 石墨：低饱和蓝灰为基底，加入陶土、紫灰和鼠尾草色。 */
+  --chart-1: #4f6878;
+  --chart-2: #647e8e;
+  --chart-3: #7a8e99;
+  --chart-4: #92989a;
+  --chart-5: #9a7967;
+  --chart-6: #a45f55;
+  --chart-7: #7a749b;
+  --chart-8: #68866e;
 }
 :root[data-theme="dark"] {
-  --chart-1: #79c7ae;
-  --chart-2: #f0a073;
-  --chart-3: #aaa9ef;
-  --chart-4: #e7c76e;
-  --chart-5: #e58eaf;
-  --chart-6: #8ec5e5;
-  --chart-7: #abc879;
-  --chart-8: #c2a5d1;
+  --chart-1: #72c5a5;
+  --chart-2: #8bcda2;
+  --chart-3: #b1c979;
+  --chart-4: #d2c46d;
+  --chart-5: #e1aa5f;
+  --chart-6: #e18870;
+  --chart-7: #79b8be;
+  --chart-8: #aaa0cc;
 }
 .chart-series-line,
 .trend-bar,
@@ -2743,7 +2769,7 @@ button.danger-button:hover {
 }
 .donut-segment:hover,
 .donut-segment:focus {
-  stroke-width: 44;
+  transform: scale(1.025);
   filter: drop-shadow(
     0 3px 3px color-mix(in srgb, var(--text) 25%, transparent)
   );
@@ -2978,4 +3004,294 @@ button.danger-button:hover {
   --chart-6: #91c5c4;
   --chart-7: #aebd95;
   --chart-8: #bea9ca;
+}
+
+/* SVG扇环使用显式主题填充色，规避不同Electron版本的描边归一化差异。 */
+.chart-stroke-1 {
+  fill: #287a60;
+}
+.chart-stroke-2 {
+  fill: #4c9674;
+}
+.chart-stroke-3 {
+  fill: #76a765;
+}
+.chart-stroke-4 {
+  fill: #a1a657;
+}
+.chart-stroke-5 {
+  fill: #cf9846;
+}
+.chart-stroke-6 {
+  fill: #c96d52;
+}
+.chart-stroke-7 {
+  fill: #4e8c94;
+}
+.chart-stroke-8 {
+  fill: #736f9c;
+}
+:root[data-palette="ocean"] .chart-stroke-1 {
+  fill: #2d6fa7;
+}
+:root[data-palette="ocean"] .chart-stroke-2 {
+  fill: #3c8fbe;
+}
+:root[data-palette="ocean"] .chart-stroke-3 {
+  fill: #43a3b0;
+}
+:root[data-palette="ocean"] .chart-stroke-4 {
+  fill: #62b39f;
+}
+:root[data-palette="ocean"] .chart-stroke-5 {
+  fill: #8ab979;
+}
+:root[data-palette="ocean"] .chart-stroke-6 {
+  fill: #d0a14e;
+}
+:root[data-palette="ocean"] .chart-stroke-7 {
+  fill: #d2765c;
+}
+:root[data-palette="ocean"] .chart-stroke-8 {
+  fill: #7e78b3;
+}
+:root[data-palette="violet"] .chart-stroke-1 {
+  fill: #7253a6;
+}
+:root[data-palette="violet"] .chart-stroke-2 {
+  fill: #8b64b3;
+}
+:root[data-palette="violet"] .chart-stroke-3 {
+  fill: #aa70ae;
+}
+:root[data-palette="violet"] .chart-stroke-4 {
+  fill: #c67698;
+}
+:root[data-palette="violet"] .chart-stroke-5 {
+  fill: #d08769;
+}
+:root[data-palette="violet"] .chart-stroke-6 {
+  fill: #5d87b2;
+}
+:root[data-palette="violet"] .chart-stroke-7 {
+  fill: #4e9687;
+}
+:root[data-palette="violet"] .chart-stroke-8 {
+  fill: #9da258;
+}
+:root[data-palette="amber"] .chart-stroke-1 {
+  fill: #a56a20;
+}
+:root[data-palette="amber"] .chart-stroke-2 {
+  fill: #bd812c;
+}
+:root[data-palette="amber"] .chart-stroke-3 {
+  fill: #cf9d3f;
+}
+:root[data-palette="amber"] .chart-stroke-4 {
+  fill: #d6b660;
+}
+:root[data-palette="amber"] .chart-stroke-5 {
+  fill: #b37659;
+}
+:root[data-palette="amber"] .chart-stroke-6 {
+  fill: #587fa1;
+}
+:root[data-palette="amber"] .chart-stroke-7 {
+  fill: #4e8f80;
+}
+:root[data-palette="amber"] .chart-stroke-8 {
+  fill: #846da1;
+}
+:root[data-palette="rose"] .chart-stroke-1 {
+  fill: #a84569;
+}
+:root[data-palette="rose"] .chart-stroke-2 {
+  fill: #be5876;
+}
+:root[data-palette="rose"] .chart-stroke-3 {
+  fill: #d17484;
+}
+:root[data-palette="rose"] .chart-stroke-4 {
+  fill: #d48b77;
+}
+:root[data-palette="rose"] .chart-stroke-5 {
+  fill: #b4679d;
+}
+:root[data-palette="rose"] .chart-stroke-6 {
+  fill: #746fb7;
+}
+:root[data-palette="rose"] .chart-stroke-7 {
+  fill: #4f8d8e;
+}
+:root[data-palette="rose"] .chart-stroke-8 {
+  fill: #78945e;
+}
+:root[data-palette="slate"] .chart-stroke-1 {
+  fill: #4f6878;
+}
+:root[data-palette="slate"] .chart-stroke-2 {
+  fill: #647e8e;
+}
+:root[data-palette="slate"] .chart-stroke-3 {
+  fill: #7a8e99;
+}
+:root[data-palette="slate"] .chart-stroke-4 {
+  fill: #92989a;
+}
+:root[data-palette="slate"] .chart-stroke-5 {
+  fill: #9a7967;
+}
+:root[data-palette="slate"] .chart-stroke-6 {
+  fill: #a45f55;
+}
+:root[data-palette="slate"] .chart-stroke-7 {
+  fill: #7a749b;
+}
+:root[data-palette="slate"] .chart-stroke-8 {
+  fill: #68866e;
+}
+:root[data-theme="dark"] .chart-stroke-1 {
+  fill: #72c5a5;
+}
+:root[data-theme="dark"] .chart-stroke-2 {
+  fill: #8bcda2;
+}
+:root[data-theme="dark"] .chart-stroke-3 {
+  fill: #b1c979;
+}
+:root[data-theme="dark"] .chart-stroke-4 {
+  fill: #d2c46d;
+}
+:root[data-theme="dark"] .chart-stroke-5 {
+  fill: #e1aa5f;
+}
+:root[data-theme="dark"] .chart-stroke-6 {
+  fill: #e18870;
+}
+:root[data-theme="dark"] .chart-stroke-7 {
+  fill: #79b8be;
+}
+:root[data-theme="dark"] .chart-stroke-8 {
+  fill: #aaa0cc;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-1 {
+  fill: #83bcef;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-2 {
+  fill: #73c9ea;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-3 {
+  fill: #6fd2da;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-4 {
+  fill: #88d5bd;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-5 {
+  fill: #acd28b;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-6 {
+  fill: #e7be6f;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-7 {
+  fill: #ea927a;
+}
+:root[data-theme="dark"][data-palette="ocean"] .chart-stroke-8 {
+  fill: #aaa3df;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-1 {
+  fill: #bea2eb;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-2 {
+  fill: #caa7ef;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-3 {
+  fill: #e09dce;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-4 {
+  fill: #ed9fbd;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-5 {
+  fill: #eeac8d;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-6 {
+  fill: #8db9e5;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-7 {
+  fill: #82c8b8;
+}
+:root[data-theme="dark"][data-palette="violet"] .chart-stroke-8 {
+  fill: #c5ce83;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-1 {
+  fill: #e5ba73;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-2 {
+  fill: #edc57c;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-3 {
+  fill: #f0d084;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-4 {
+  fill: #eadb9b;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-5 {
+  fill: #dda38a;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-6 {
+  fill: #9bbbd8;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-7 {
+  fill: #83c5b3;
+}
+:root[data-theme="dark"][data-palette="amber"] .chart-stroke-8 {
+  fill: #c4a6da;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-1 {
+  fill: #e99ab8;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-2 {
+  fill: #efa6bd;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-3 {
+  fill: #f2b0bc;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-4 {
+  fill: #efb39f;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-5 {
+  fill: #dca3d0;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-6 {
+  fill: #aaa6e6;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-7 {
+  fill: #82c5c6;
+}
+:root[data-theme="dark"][data-palette="rose"] .chart-stroke-8 {
+  fill: #afc781;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-1 {
+  fill: #a7c0d1;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-2 {
+  fill: #b5ccd8;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-3 {
+  fill: #c4d1d6;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-4 {
+  fill: #d0d2cf;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-5 {
+  fill: #d1ad99;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-6 {
+  fill: #df9b91;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-7 {
+  fill: #b9add3;
+}
+:root[data-theme="dark"][data-palette="slate"] .chart-stroke-8 {
+  fill: #a6c2aa;
 }

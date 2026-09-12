@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "薪流 SalaryFlow",
+    "name": "SalaryFlow",
     "slug": "salaryflow-mobile",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "salaryflow",
@@ -12,9 +12,9 @@
     },
     "android": {
       "package": "com.xrosen26.salaryflow",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
-        "backgroundColor": "#EAF3EE",
+        "backgroundColor": "#155F4B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -38,7 +38,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#176B55",
+          "backgroundColor": "#155F4B",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 88
         }
@@ -49,6 +49,10 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "locales": {
+      "zh-CN": "./locales/zh-CN.json",
+      "en": "./locales/en.json"
     }
   }
 }
