@@ -124,7 +124,8 @@ try {
     ["工资分配", "05-allocation"],
     ["我的账户", "06-accounts"],
     ["统计分析", "07-analysis"],
-    ["设置与数据", "08-settings"],
+    ["帮助与使用手册", "08-help"],
+    ["设置与数据", "09-settings"],
   ]) {
     await page
       .locator("nav")
@@ -138,6 +139,19 @@ try {
       assert.equal(
         await page.getByLabel("交易排序").inputValue(),
         "amount_desc",
+      );
+    }
+    if (name === "帮助与使用手册") {
+      await page
+        .locator(".page-heading")
+        .getByRole("heading", { name: "帮助与使用手册", exact: true })
+        .waitFor();
+      assert(
+        await page
+          .locator(".settings-tabs")
+          .getByRole("button", { name: "帮助与使用手册", exact: true })
+          .evaluate((element) => element.classList.contains("active")),
+        "帮助入口没有打开设置中的帮助页签",
       );
     }
     if (name === "统计分析") {

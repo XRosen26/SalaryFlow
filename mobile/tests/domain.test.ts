@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { budgetPeriodRange, cycleRange } from "../src/domain/dates";
+import {
+  budgetPeriodRange,
+  cycleRange,
+  normalizeDateInput,
+  validDate,
+} from "../src/domain/dates";
 import { budgetTone, parseMoneyExpression } from "../src/domain/money";
 
 test("金额算式保持精确并只在最后舍入到分", () => {
@@ -14,6 +19,17 @@ test("金额算式拒绝除零、负结果和任意代码", () => {
   assert.throws(() => parseMoneyExpression("1/0"), /除数不能为零/);
   assert.throws(() => parseMoneyExpression("1-2"), /金额超出允许范围/);
   assert.throws(() => parseMoneyExpression("process.exit()"), /只能包含/);
+});
+
+test("日期输入支持常见中文、分隔符和紧凑格式", () => {
+  assert.equal(normalizeDateInput("2026年9月13日"), "2026-09-13");
+  assert.equal(normalizeDateInput("2026-9-3"), "2026-09-03");
+  assert.equal(normalizeDateInput("2026/09/13"), "2026-09-13");
+  assert.equal(normalizeDateInput("20260913"), "2026-09-13");
+  assert.throws(() => normalizeDateInput("2026-02-30"), /日期无效/);
+  assert.throws(() => normalizeDateInput("09-13-2026"), /日期支持/);
+  assert.equal(validDate("2026-09-13"), "2026-09-13");
+  assert.throws(() => validDate("2026年9月13日"), /日期格式无效/);
 });
 
 test("工资日位于短月时使用当月最后一天", () => {

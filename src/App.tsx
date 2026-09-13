@@ -41,6 +41,7 @@ import {
   FileText,
 } from "lucide-react";
 import { Help } from "./Help";
+import brandIcon from "../build/icon.png";
 import { amountVisible, budgetColor } from "../core/presentation.mjs";
 import { decimal } from "../core/money.mjs";
 import {
@@ -98,6 +99,7 @@ const pages = [
   { key: "allocations", label: msg("工资分配"), icon: Sparkles },
   { key: "accounts", label: msg("我的账户"), icon: Landmark },
   { key: "analysis", label: msg("统计分析"), icon: ChartNoAxesCombined },
+  { key: "help", label: msg("帮助与使用手册"), icon: CircleHelp },
   { key: "settings", label: msg("设置与数据"), icon: Settings2 },
 ];
 const ranges = [
@@ -1405,7 +1407,7 @@ export default function App() {
     return (
       <div className="loading-screen">
         <div className="brand-mark">
-          <Wallet size={26} />
+          <img className="brand-logo-image" src={brandIcon} alt="" />
         </div>
         <h2>{msg("薪流 SalaryFlow")}</h2>
         <p>{error || msg("正在打开本地账本…")}</p>
@@ -1449,7 +1451,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark">
-            <Wallet size={24} />
+            <img className="brand-logo-image" src={brandIcon} alt="" />
           </span>
           <div>
             <strong>{msg("薪流")}</strong>
@@ -1461,12 +1463,38 @@ export default function App() {
           {pages.map((p) => (
             <button
               key={p.key}
-              className={page === p.key ? "selected" : ""}
-              onClick={() => goto(p.key)}
+              className={
+                (
+                  p.key === "help"
+                    ? page === "settings" && settingsTab === "help"
+                    : p.key === "settings"
+                      ? page === "settings" && settingsTab !== "help"
+                      : page === p.key
+                )
+                  ? "selected"
+                  : ""
+              }
+              onClick={() => {
+                if (p.key === "help") {
+                  setSettingsTab("help");
+                  goto("settings");
+                } else {
+                  if (p.key === "settings") setSettingsTab("general");
+                  goto(p.key);
+                }
+              }}
             >
               <p.icon size={19} />
               <span>{p.label}</span>
-              {page === p.key && <span className="nav-dot" />}
+              {((p.key === "help" &&
+                page === "settings" &&
+                settingsTab === "help") ||
+                (p.key === "settings" &&
+                  page === "settings" &&
+                  settingsTab !== "help") ||
+                (!["help", "settings"].includes(p.key) && page === p.key)) && (
+                <span className="nav-dot" />
+              )}
             </button>
           ))}
         </nav>
@@ -1507,7 +1535,11 @@ export default function App() {
           <div className="breadcrumb">
             {msg("我的账本")}
             <ChevronRight size={13} />{" "}
-            <b>{pages.find((p) => p.key === page)?.label}</b>
+            <b>
+              {page === "settings" && settingsTab === "help"
+                ? msg("帮助与使用手册")
+                : pages.find((p) => p.key === page)?.label}
+            </b>
           </div>
           <div className="top-actions">
             <span className="local-status">
@@ -1558,9 +1590,15 @@ export default function App() {
               <h1>
                 {page === "overview"
                   ? msg("财务总览")
-                  : pages.find((p) => p.key === page)?.label}
+                  : page === "settings" && settingsTab === "help"
+                    ? msg("帮助与使用手册")
+                    : pages.find((p) => p.key === page)?.label}
               </h1>
-              <p>{headerSub[page]}</p>
+              <p>
+                {page === "settings" && settingsTab === "help"
+                  ? msg("快速了解功能、计算口径和数据管理。")
+                  : headerSub[page]}
+              </p>
             </div>
             <div className="heading-actions">
               {!["settings", "accounts"].includes(page) && (
@@ -3471,7 +3509,7 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.7.1 · Windows 与 Android 本地个人预算、现金流和资产管理",
+                          "SalaryFlow 0.7.2 · Windows 与 Android 本地个人预算、现金流和资产管理",
                         )}
                       </p>
                       <p>
@@ -4035,7 +4073,7 @@ function Onboarding({
       <aside>
         <div className="brand">
           <span className="brand-mark">
-            <Wallet size={25} />
+            <img className="brand-logo-image" src={brandIcon} alt="" />
           </span>
           <div>
             <strong>{msg("薪流")}</strong>

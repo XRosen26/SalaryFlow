@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,11 +15,12 @@ import {
   View,
 } from "react-native";
 
+import { DateField } from "@/components/date-field";
 import { AppScreen, Card, LoadingState, PageHeader } from "@/components/ui";
 import { radius, spacing, useAppTheme } from "@/constants/theme";
 import { useFinance } from "@/data/finance-context";
 import type { TransactionKind } from "@/data/repository";
-import { today, validDate } from "@/domain/dates";
+import { normalizeDateInput, today } from "@/domain/dates";
 import {
   formatMoney,
   isMoneyExpression,
@@ -267,7 +269,6 @@ export default function AddScreen() {
         category.kind === (next === "INCOME" ? "INCOME" : "EXPENSE"),
     );
     setCategoryId(nextCategories[0]?.id ?? "");
-    requestAnimationFrame(() => amountRef.current?.focus());
   };
 
   const appendOperator = (operator: string) => {
@@ -278,12 +279,13 @@ export default function AddScreen() {
   const save = async () => {
     try {
       const amountMinor = Number(parseMoneyExpression(amount));
-      validDate(date);
+      const normalizedDate = normalizeDateInput(date);
+      setDate(normalizedDate);
       setSaving(true);
       const payload = {
         kind,
         amountMinor,
-        date,
+        date: normalizedDate,
         sourceId: kind === "INCOME" ? undefined : sourceId,
         destinationId: kind === "EXPENSE" ? undefined : destinationId,
         categoryId: kind === "TRANSFER" ? undefined : categoryId,
@@ -340,7 +342,7 @@ export default function AddScreen() {
           subtitle={
             params.id
               ? "保存后会重新计算账户余额、预算与统计。"
-              : "金额、账户、分类和日期确认后才会写入本地账本。"
+              : "先选类型和分类，再填写金额、账户与实际发生日期。"
           }
         />
         <View
@@ -379,6 +381,73 @@ export default function AddScreen() {
           })}
         </View>
 
+        {kind !== "TRANSFER" ? (
+          <View style={styles.field}>
+            <View style={styles.categoryHeader}>
+              <View style={styles.categoryHeaderText}>
+                <Text style={[styles.fieldTitle, { color: colors.text }]}>
+                  分类
+                </Text>
+                <Text
+                  style={[styles.categoryHint, { color: colors.textSecondary }]}
+                >
+                  按分组展示全部可用分类，图标帮助快速定位。
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/categories" as never)}
+                hitSlop={8}
+              >
+                <Text
+                  style={[styles.manageCategories, { color: colors.primary }]}
+                >
+                  管理分类 ›
+                </Text>
+              </Pressable>
+            </View>
+            {Object.entries(categoryGroups).map(([group, items]) => (
+              <View key={group} style={styles.categoryGroup}>
+                <Text
+                  style={[
+                    styles.categoryGroupName,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {group}
+                </Text>
+                <View
+                  accessibilityRole="radiogroup"
+                  style={styles.categoryGrid}
+                >
+                  {items.map((category) => (
+                    <CategoryTile
+                      key={category.id}
+                      name={category.name}
+                      group={category.groupName}
+                      selected={categoryId === category.id}
+                      onPress={() => setCategoryId(category.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View
+            style={[styles.notice, { backgroundColor: colors.primarySoft }]}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.noticeText, { color: colors.text }]}>
+              转账只移动账户资金，不计作收入、支出或储蓄。
+            </Text>
+          </View>
+        )}
+
         <Card style={styles.amountCard}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>
             {kind === "TRANSFER"
@@ -391,7 +460,6 @@ export default function AddScreen() {
             <Text style={[styles.currency, { color: colors.text }]}>¥</Text>
             <TextInput
               ref={amountRef}
-              autoFocus
               value={amount}
               onChangeText={setAmount}
               keyboardType="decimal-pad"
@@ -399,6 +467,8 @@ export default function AddScreen() {
               placeholderTextColor={colors.textSecondary}
               style={[styles.amountInput, { color: colors.text }]}
               accessibilityLabel="金额，可输入算式"
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
             />
           </View>
           <View style={styles.operators}>
@@ -474,73 +544,6 @@ export default function AddScreen() {
           </View>
         ) : null}
 
-        {kind !== "TRANSFER" ? (
-          <View style={styles.field}>
-            <View style={styles.categoryHeader}>
-              <View style={styles.categoryHeaderText}>
-                <Text style={[styles.fieldTitle, { color: colors.text }]}>
-                  分类
-                </Text>
-                <Text
-                  style={[styles.categoryHint, { color: colors.textSecondary }]}
-                >
-                  按分组展示全部可用分类，图标帮助快速定位。
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push("/categories" as never)}
-                hitSlop={8}
-              >
-                <Text
-                  style={[styles.manageCategories, { color: colors.primary }]}
-                >
-                  管理分类 ›
-                </Text>
-              </Pressable>
-            </View>
-            {Object.entries(categoryGroups).map(([group, items]) => (
-              <View key={group} style={styles.categoryGroup}>
-                <Text
-                  style={[
-                    styles.categoryGroupName,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {group}
-                </Text>
-                <View
-                  accessibilityRole="radiogroup"
-                  style={styles.categoryGrid}
-                >
-                  {items.map((category) => (
-                    <CategoryTile
-                      key={category.id}
-                      name={category.name}
-                      group={category.groupName}
-                      selected={categoryId === category.id}
-                      onPress={() => setCategoryId(category.id)}
-                    />
-                  ))}
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View
-            style={[styles.notice, { backgroundColor: colors.primarySoft }]}
-          >
-            <Ionicons
-              name="information-circle-outline"
-              size={20}
-              color={colors.primary}
-            />
-            <Text style={[styles.noticeText, { color: colors.text }]}>
-              转账只移动账户资金，不计作收入、支出或储蓄。
-            </Text>
-          </View>
-        )}
-
         {kind === "INCOME" ? (
           <View style={[styles.switchRow, { borderColor: colors.border }]}>
             <View style={styles.switchText}>
@@ -559,25 +562,7 @@ export default function AddScreen() {
           </View>
         ) : null}
 
-        <View style={styles.field}>
-          <Text style={[styles.fieldTitle, { color: colors.text }]}>
-            实际发生日期
-          </Text>
-          <TextInput
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.textSecondary}
-            style={[
-              styles.textInput,
-              {
-                color: colors.text,
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-        </View>
+        <DateField label="实际发生日期" value={date} onChange={setDate} />
 
         <View style={styles.field}>
           <Text style={[styles.fieldTitle, { color: colors.text }]}>

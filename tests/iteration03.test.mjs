@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+fs.mkdirSync(path.resolve(".local"), { recursive: true });
 import { Store } from "../core/store.mjs";
 import { relocate, readLocation } from "../core/storage.mjs";
 import { budgetColor } from "../core/presentation.mjs";

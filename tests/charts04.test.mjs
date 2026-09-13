@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+fs.mkdirSync(path.resolve(".local"), { recursive: true });
 import { trendData, pieData } from "../core/charts.mjs";
 import { Store } from "../core/store.mjs";
 import { amountVisible } from "../core/presentation.mjs";

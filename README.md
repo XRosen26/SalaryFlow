@@ -4,11 +4,11 @@
 
 ## 下载
 
-当前发布：**Windows 0.7.1 / Android 0.3.0 预览版**。
+当前发布：**Windows 0.7.2 / Android 0.4.0 预览版**。
 
-- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.7.1/SalaryFlow-Setup-0.7.1-x64.exe)
-- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.7.1/SalaryFlow-Portable-0.7.1-x64.exe)
-- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.7.1/SalaryFlow-Android-0.3.0-preview-arm64-v8a.apk)
+- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.7.2/SalaryFlow-Setup-0.7.2-x64.exe)
+- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.7.2/SalaryFlow-Portable-0.7.2-x64.exe)
+- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.7.2/SalaryFlow-Android-0.4.0-preview-arm64-v8a.apk)
 
 Windows 安装包暂未使用公开代码签名证书，系统可能提示“未知发布者”。便携版无需安装，账本仍保存在用户数据目录。Android 预览包支持 Android 7（API 24）及以上、按 API 36 构建，使用预览签名，适合个人试用。
 
@@ -16,8 +16,8 @@ Windows 安装包暂未使用公开代码签名证书，系统可能提示“未
 
 | 平台            | 当前版本   | 定位与状态                                             |
 | --------------- | ---------- | ------------------------------------------------------ |
-| Windows         | 0.7.1      | 完整桌面端；适合录入、预算规划、分析、备份与长期维护   |
-| Android         | 0.3.0 预览 | 触屏优先；突出快速记账、预算、安心支出、账户和移动分析 |
+| Windows         | 0.7.2      | 完整桌面端；适合录入、预算规划、分析、备份与长期维护   |
+| Android         | 0.4.0 预览 | 触屏优先；突出快速记账、预算、安心支出、账户和移动分析 |
 | iOS / HarmonyOS | 规划中     | 待 Android 基本体验稳定后评估；继续沿用相同财务口径    |
 
 Windows 与 Android 目前各自保存本地账本，不做多设备实时同步。完整 JSON 备份用于迁移或恢复，属于整库替换，不会合并两端同时产生的记录。
@@ -31,7 +31,8 @@ Windows 与 Android 目前各自保存本地账本，不做多设备实时同步
 - 六套配色与浅色/深色主题；图表颜色随界面配色和明暗主题协调变化
 - 金额输入支持 `+ - * / ( )`，最终结果以整数“分”保存，避免浮点误差
 - JSON 完整备份与恢复、CSV/JSON/Markdown 导出、重复导入识别和安全重置账本
-- Android 快速记账以“图标 + 分类名”完整展示分类；安心支出卡与预算执行率采用同一套七级风险色
+- Android 快速记账按“类型 → 分类 → 金额 → 账户 → 日期”组织；分类使用图标和文字，日期支持日历与多种输入格式
+- Windows 侧栏和 Android 首页均提供显眼的使用说明入口；Android 可固定浅色/深色或跟随系统
 
 ## 财务口径
 

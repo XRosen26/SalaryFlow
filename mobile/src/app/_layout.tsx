@@ -2,10 +2,14 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { SQLiteProvider } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { AppThemeProvider, type PaletteName } from "@/constants/theme";
+import {
+  AppThemeProvider,
+  type PaletteName,
+  type ThemeMode,
+  useResolvedThemeMode,
+} from "@/constants/theme";
 import { FinanceProvider, useFinance } from "@/data/finance-context";
 import { initializeDatabase } from "@/data/repository";
 
@@ -29,19 +33,29 @@ function Navigator() {
     >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="help" />
       <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
     </Stack>
   );
 }
 
+function ThemedContent() {
+  const resolvedMode = useResolvedThemeMode();
+  return (
+    <>
+      <StatusBar style={resolvedMode === "dark" ? "light" : "dark"} />
+      <Navigator />
+    </>
+  );
+}
+
 function ThemedApplication() {
   const { snapshot } = useFinance();
-  const dark = useColorScheme() === "dark";
   const palette = (snapshot?.settings.palette ?? "forest") as PaletteName;
+  const mode = (snapshot?.settings.themeMode ?? "system") as ThemeMode;
   return (
-    <AppThemeProvider palette={palette}>
-      <StatusBar style={dark ? "light" : "dark"} />
-      <Navigator />
+    <AppThemeProvider palette={palette} mode={mode}>
+      <ThemedContent />
     </AppThemeProvider>
   );
 }

@@ -19,6 +19,7 @@ export type Settings = {
   amountsVisible: boolean;
   accountSummaryVisible: boolean;
   palette: "forest" | "ocean" | "violet" | "amber" | "rose" | "slate";
+  themeMode: "system" | "light" | "dark";
   onboardingComplete: boolean;
 };
 
@@ -101,6 +102,7 @@ const defaultSettings: Settings = {
   amountsVisible: true,
   accountSummaryVisible: true,
   palette: "forest",
+  themeMode: "system",
   onboardingComplete: false,
 };
 

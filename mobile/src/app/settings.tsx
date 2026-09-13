@@ -19,13 +19,13 @@ import {
   Divider,
   LoadingState,
   PageHeader,
-  Pill,
 } from "@/components/ui";
 import {
   radius,
   spacing,
   useAppTheme,
   type PaletteName,
+  type ThemeMode,
 } from "@/constants/theme";
 import { inspectBackup, restoreBackup, shareBackup } from "@/data/backup";
 import { useFinance } from "@/data/finance-context";
@@ -92,6 +92,17 @@ const paletteOptions: {
   { id: "rose", name: "玫瑰", description: "温润明快", color: "#A4476C" },
   { id: "slate", name: "石墨", description: "低调中性", color: "#546775" },
 ];
+
+const themeModeOptions: {
+  id: ThemeMode;
+  name: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { id: "system", name: "跟随系统", icon: "phone-portrait-outline" },
+  { id: "light", name: "浅色", icon: "sunny-outline" },
+  { id: "dark", name: "深色", icon: "moon-outline" },
+];
+
 export default function SettingsScreen() {
   const colors = useAppTheme();
   const router = useRouter();
@@ -253,6 +264,34 @@ export default function SettingsScreen() {
 
       <View>
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+          账本管理
+        </Text>
+        <Card style={styles.group}>
+          <SettingRow
+            icon="pricetags-outline"
+            title="收支分类"
+            description="新增、修改或归档记账与预算使用的分类。"
+            onPress={() => router.push("/categories" as never)}
+          />
+          <Divider />
+          <SettingRow
+            icon="receipt-outline"
+            title="固定账单"
+            description="管理周期账单，并在实际支付后确认入账。"
+            onPress={() => router.push("/bills" as never)}
+          />
+          <Divider />
+          <SettingRow
+            icon="wallet-outline"
+            title="账户与主要用途"
+            description="管理账户，并设置工资、消费、储蓄等主要用途。"
+            onPress={() => router.push("/(tabs)/accounts" as never)}
+          />
+        </Card>
+      </View>
+
+      <View>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
           外观
         </Text>
         <Card style={styles.paletteCard}>
@@ -314,6 +353,56 @@ export default function SettingsScreen() {
                       color={colors.primary}
                     />
                   ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+          <Divider />
+          <Text style={[styles.rowTitle, { color: colors.text }]}>
+            明暗模式
+          </Text>
+          <Text
+            style={[styles.rowDescription, { color: colors.textSecondary }]}
+          >
+            可跟随 Android 系统，也可固定使用浅色或深色。
+          </Text>
+          <View accessibilityRole="radiogroup" style={styles.modeGrid}>
+            {themeModeOptions.map((item) => {
+              const selected = snapshot.settings.themeMode === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() =>
+                    void (async () => {
+                      await updateSettings(db, { themeMode: item.id });
+                      await refresh();
+                    })()
+                  }
+                  style={[
+                    styles.modeChoice,
+                    {
+                      borderColor: selected ? colors.primary : colors.border,
+                      backgroundColor: selected
+                        ? colors.primarySoft
+                        : colors.surface,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={20}
+                    color={selected ? colors.primary : colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.modeName,
+                      { color: selected ? colors.text : colors.textSecondary },
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -410,40 +499,15 @@ export default function SettingsScreen() {
 
       <View>
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-          帮助
+          帮助与支持
         </Text>
         <Card style={styles.group}>
           <SettingRow
             icon="help-circle-outline"
-            title="使用说明"
-            description="了解可安心支出、预算、工资分配、退款、账单、理财和备份。"
+            title="使用说明与关于"
+            description="了解功能、财务口径、数据边界和当前版本。"
             onPress={() => router.push("/help" as never)}
           />
-        </Card>
-      </View>
-      <View>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-          关于
-        </Text>
-        <Card style={styles.about}>
-          <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-            <Ionicons name="wallet-outline" size={28} color="#FFFFFF" />
-          </View>
-          <View style={styles.aboutText}>
-            <Text style={[styles.aboutTitle, { color: colors.text }]}>
-              薪流 SalaryFlow
-            </Text>
-            <Text
-              style={[styles.rowDescription, { color: colors.textSecondary }]}
-            >
-              Android 0.3.0 · 本地优先个人现金流管理
-            </Text>
-          </View>
-          <Pill text="Android" color={colors.info} />
-          <Text style={[styles.aboutBody, { color: colors.textSecondary }]}>
-            薪流由 XRosen26 使用 Codex 完成并持续迭代。当前提供 Windows 与
-            Android 版本，分别针对大屏和触屏优化；未来平台将沿用一致的财务口径。
-          </Text>
         </Card>
       </View>
       {busy ? (
@@ -489,6 +553,17 @@ const styles = StyleSheet.create({
   },
   paletteSwatch: { width: 28, height: 28, borderRadius: 9 },
   paletteText: { flex: 1, gap: 2 },
+  modeGrid: { flexDirection: "row", gap: spacing.sm },
+  modeChoice: {
+    flex: 1,
+    minHeight: 52,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  modeName: { fontSize: 11, fontWeight: "800" },
   paletteName: { fontSize: 14, fontWeight: "800" },
   paletteDescription: { fontSize: 10 },
   row: {

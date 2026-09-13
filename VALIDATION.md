@@ -1,4 +1,12 @@
-# 验证记录 · Windows 0.7.1 / Android 0.3.0
+# 验证记录 · Windows 0.7.2 / Android 0.4.0
+
+## Windows 0.7.2 / Android 0.4.0验收 · 2026-09-13
+
+Windows：56项Node财务与可靠性测试全部通过，TypeScript/Vite生产构建通过；源码Electron与0.7.2解包程序分别通过完整桌面流程，打包程序另通过中英切换及财务数据不变测试。新增断言确认侧栏“帮助与使用手册”直接打开设置内帮助页签。安装版和便携版均为x64，Authenticode状态为NotSigned。
+
+Android：Expo SDK 57公开配置解析通过；TypeScript和8项领域测试全部通过，新增中文年月日、连字符、斜杠、八位数字及非法日期测试。ARM64 Release执行576个Gradle任务并通过Lint Vital、资源优化和V2预览签名。合并清单确认versionName 0.4.0、versionCode 4、minSdk 24、targetSdk 36、allowBackup=false，仅含震动和应用内部接收器权限；APK只含arm64-v8a，未发现数据库、账本或备份文件。生成资源确认中文简体启动器名称为“薪流”，默认及英文为“SalaryFlow”。
+
+发布物：Windows安装版 92D620C0297D1744D7561CDFEF30C5FC1DC5D1B64282CCDFD19688547852142A；Windows便携版 9A07500F5192EFB7DE40A215EFD4C1732610E928CF6F97DF03245C9E0C127ABC；Android APK B378D0FD642ED4B515B15625F34097B5B4FB14AD5BD256A11CBC8690013DE0EF。本轮未连接真实手机或模拟器，因此键盘避让、系统返回、大字体和不同厂商系统仍需持续真机试用。
 
 ## Windows 0.7.1 / Android 0.3.0验收 · 2026-09-13
 

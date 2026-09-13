@@ -1,12 +1,12 @@
 # 薪流 Android 技术与数据设计
 
-版本：0.1　更新：2026-09-12
+版本：0.4　更新：2026-09-13
 
 ## 1. 技术基线
 
 - Expo SDK 57、React Native 0.86、React 19.2、Expo Router、TypeScript 6。
 - `expo-sqlite` 保存账本；WAL、外键约束、独占事务和参数绑定。
-- React Context + repository hooks 管理数据刷新；不在 UI 中拼接 SQL。
+- React Context + repository hooks 管理数据刷新；不在 UI 中拼接 SQL。palette与明暗模式由根主题Provider统一解析。palette与明暗模式先在根Provider解析，再向全部页面提供同一主题色。
 - `react-native-svg` 绘制基础图表；列表规模扩大后评估 FlashList。
 - `expo-file-system`、DocumentPicker、Sharing 负责备份交换；生物识别/PIN 确定进入 P1 时再引入密钥存储与认证依赖。
 
@@ -24,7 +24,7 @@ Expo SQLite repository
 salaryflow-mobile.db + backups
 ```
 
-`domain/` 仅包含平台无关的金额、日期、周期和聚合规则，可用 Node 直接测试。`data/` 负责迁移和数据库读写。桌面端同步业务规则测试向量，但不直接引用 Node `node:sqlite` 运行时。
+`domain/` 仅包含平台无关的金额、日期、周期和聚合规则，可用 Node 直接测试。日期输入在进入repository前统一归一为ISO日期。`data/` 负责迁移和数据库读写。桌面端同步业务规则测试向量，但不直接引用 Node `node:sqlite` 运行时。
 
 ## 3. 数据模型
 
@@ -84,6 +84,7 @@ salaryflow-mobile.db + backups
 - 全局与单卡金额隐藏已实现；后台遮挡、截图保护、生物识别/PIN 属于 P1，需先确认恢复策略。
 - 导出页面说明备份含财务数据；分享由 Android 系统面板完成。
 - 发布产物从不含数据库、恢复点和备份文件的源码构建，并核对 APK 权限、签名、架构和 SHA-256。
+
 ## 8. 测试
 
 - 领域单元测试：整数金额、算式优先级/除零/舍入、周期边界、时间范围、预算状态。
@@ -94,4 +95,4 @@ salaryflow-mobile.db + backups
 
 ## 9. 构建与发布
 
-开发使用 Expo Go 验证纯 JS 功能，原生权限及发布包使用 `npx expo run:android` 和 Android Studio。首个发布物是使用 Android 调试证书签署的 ARM64 release 预览 APK，可脱离开发服务器运行；准备商店时必须改用用户持有的正式签名密钥并生成 AAB，同时记录 versionCode、签名摘要、依赖清单和 SHA-256。Windows 构建使用 `scripts/build_android_preview.ps1` 复制干净源码到短英文路径，以避开 NDK/CMake 的中文路径和 260 字符限制。
+开发使用 Expo Go 验证纯 JS 功能，原生权限及发布包使用 `npx expo run:android` 和 Android Studio。首个发布物是使用 Android 调试证书签署的 ARM64 release 预览 APK，可脱离开发服务器运行；准备商店时必须改用用户持有的正式签名密钥并生成 AAB，同时记录 versionCode、签名摘要、依赖清单和 SHA-256。Windows构建脚本在英文项目路径内运行Expo prebuild和Gradle，原生目录及APK均生成在 mobile/ 下；脚本不会复制账本或用户备份。

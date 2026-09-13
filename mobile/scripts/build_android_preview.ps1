@@ -48,7 +48,7 @@ try {
   $releaseRoot = Join-Path $mobileRoot 'release'
   New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
   Get-ChildItem -LiteralPath $releaseRoot -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.apk', '.sha256' } | Remove-Item -Force
-  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-0.3.0-preview-$Architecture.apk"
+  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-0.4.0-preview-$Architecture.apk"
   Copy-Item -LiteralPath $builtApk -Destination $outputApk -Force
   $hash = (Get-FileHash -LiteralPath $outputApk -Algorithm SHA256).Hash
   "$hash  $(Split-Path -Leaf $outputApk)" | Set-Content -LiteralPath "$outputApk.sha256" -Encoding ascii

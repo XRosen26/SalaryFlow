@@ -92,6 +92,21 @@ export default function HomeScreen() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="使用说明与关于"
+              onPress={() => router.push("/help" as never)}
+              style={[
+                styles.headerIcon,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Ionicons
+                name="help-circle-outline"
+                size={22}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel="设置与数据"
               onPress={() => router.push("/settings" as never)}
               style={[

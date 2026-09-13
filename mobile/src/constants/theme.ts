@@ -321,18 +321,34 @@ export const palettes: Record<PaletteName, PalettePair> = {
   },
 };
 
-const PaletteContext = createContext<PaletteName>("forest");
+export type ThemeMode = "system" | "light" | "dark";
+type ThemePreference = { palette: PaletteName; mode: ThemeMode };
+const ThemeContext = createContext<ThemePreference>({
+  palette: "forest",
+  mode: "system",
+});
 
 export function AppThemeProvider({
   palette,
+  mode = "system",
   children,
-}: PropsWithChildren<{ palette: PaletteName }>) {
-  return createElement(PaletteContext.Provider, { value: palette }, children);
+}: PropsWithChildren<{ palette: PaletteName; mode?: ThemeMode }>) {
+  return createElement(
+    ThemeContext.Provider,
+    { value: { palette, mode } },
+    children,
+  );
+}
+
+export function useResolvedThemeMode(): "light" | "dark" {
+  const { mode } = useContext(ThemeContext);
+  const system = useColorScheme();
+  return mode === "system" ? (system === "dark" ? "dark" : "light") : mode;
 }
 
 export function useAppTheme(): AppColors {
-  const palette = useContext(PaletteContext);
-  return palettes[palette][useColorScheme() === "dark" ? "dark" : "light"];
+  const { palette } = useContext(ThemeContext);
+  return palettes[palette][useResolvedThemeMode()];
 }
 
 export const spacing = {
