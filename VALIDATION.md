@@ -1,4 +1,14 @@
-# 验证记录 · Windows 0.7.2 / Android 0.4.0
+# 验证记录 · Windows 0.8.0 / Android 0.5.0
+
+## Windows 0.8.0 / Android 0.5.0 验收 · 2026-09-14
+
+Windows：59项Node财务与可靠性测试全部通过，TypeScript/Vite生产构建通过；源码Electron与同次构建的0.8.0解包程序均通过完整桌面流程。交互验收覆盖九个一级页面、交易日期与金额范围、待收款创建、金额算式、预算与交易排序、统计标签、周期预算、六套配色、深浅主题及说明气泡边界。待收款测试确认借出与分次归还只改变账户现金和待收余额，不进入收入、支出、预算或储蓄率；余额不足、超额归还和错误日期均原子回滚。数据库schema升级至5。
+
+Android：Expo SDK 57配置解析、TypeScript和8项领域测试通过；ARM64 Release执行576个Gradle任务并通过Lint Vital与资源优化。APK清单确认versionName 0.5.0、versionCode 5、minSdk 24、target/compileSdk 36，中文简体启动器名为“薪流”，默认及英文为“SalaryFlow”，仅含震动及应用内部接收器权限；未申请网络、旧外部存储或悬浮窗权限。APK只含arm64-v8a，未发现数据库、账本或备份文件。
+
+iOS：共用Expo工程已配置com.xrosen26.salaryflow、buildNumber 5、系统本地化名称和平板支持；iOS HBC bundle导出成功（1389个模块）。Windows不能完成Xcode原生签名，因此本次没有IPA，仍需在macOS上做模拟器与真机验收。
+
+发布物：Windows安装版 8E6A9696E29B8F4894F747379E88CE80CA4D2E6B19A5B50EF325B42B4635943B；Windows便携版 78C80B429679B749D226A36450D4C94B24F0FF435CB993ED4FC7BF595BF7CE6F；Android APK 91DAB9B6A445B7E6D12B3F7494F329259552A406DE1312D9B9D9BD3677983AE2。Windows包内ASAR共4059个条目，隐私扫描0项命中；两个Windows文件未使用公开代码签名证书。本轮未连接真实Android/iOS设备，键盘避让、大字体、厂商系统差异和提醒到达时机仍需持续真机试用。
 
 ## Windows 0.7.2 / Android 0.4.0验收 · 2026-09-13
 

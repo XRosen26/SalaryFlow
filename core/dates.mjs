@@ -81,7 +81,8 @@ export function timeRange(mode, anchor = today(), custom = {}) {
     };
   if (mode === "year")
     return { start: monthDay(y, 0, 1), end: monthDay(y + 1, 0, 1) };
-  if (/^days(7|30|90)$/.test(mode))
+  if (mode === "today") return { start: anchor, end: addDays(anchor, 1) };
+  if (/^days(3|7|30|90)$/.test(mode))
     return {
       start: addDays(anchor, 1 - Number(mode.slice(4))),
       end: addDays(anchor, 1),

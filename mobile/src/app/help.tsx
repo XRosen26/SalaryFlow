@@ -16,8 +16,16 @@ const topics = [
     "可点日历直接选择，也可输入 2026-09-13、2026年9月13日、2026/9/13 或 20260913，离开输入框后会统一为 YYYY-MM-DD。",
   ],
   [
-    "当前可安心支出",
-    "取“本期剩余预算”和“主要消费账户可用余额”中的较小非负值。预算是计划额度，账户余额是真实资金，两者不会互相替代。",
+    "预算状态与安心支出",
+    "预算有余额时，安心支出取本期剩余预算与主要消费账户可用余额中的较小非负值；预算用完或超支后，首页会切换为明确提醒。",
+  ],
+  [
+    "交易范围与统计",
+    "交易明细可组合日期、金额、类型、搜索和排序。统计提供今日、近3/7/30/90天等范围，均按实际发生日期计算。",
+  ],
+  [
+    "待收款",
+    "借出款记录对方、账户和可选归还日，可分次归还。借出与归还只改变账户和待收余额，不计收入、支出、预算或储蓄率。",
   ],
   [
     "预算与周期",
@@ -147,15 +155,14 @@ export default function HelpScreen() {
             薪流 SalaryFlow
           </Text>
           <Text style={[styles.version, { color: colors.primary }]}>
-            Android 0.4.0
+            移动端 0.5.0
           </Text>
           <Text style={[styles.aboutBody, { color: colors.textSecondary }]}>
             薪流是一款本地优先的个人预算、现金流与资产管理应用，由 XRosen26 使用
             Codex 完成并持续迭代。
           </Text>
           <Text style={[styles.aboutBody, { color: colors.textSecondary }]}>
-            当前提供 Windows 与 Android
-            版本，分别针对大屏和触屏优化；未来平台继续沿用一致的财务计算与数据规则。
+            当前提供 Windows 与 Android 预览版，iOS 共用工程已搭建。各平台按屏幕与输入方式优化，并沿用一致的财务计算与数据规则。
           </Text>
           <View
             style={[styles.privacy, { backgroundColor: colors.primarySoft }]}

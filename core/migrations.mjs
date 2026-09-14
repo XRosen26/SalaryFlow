@@ -13,6 +13,13 @@ ALTER TABLE accounts ADD COLUMN valuation_mode INTEGER NOT NULL DEFAULT 0 CHECK(
 ALTER TABLE allocation_plans ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1));
 CREATE TABLE account_valuations (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id), date TEXT NOT NULL, value_minor INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '', operation_id TEXT NOT NULL REFERENCES operations(id), revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, UNIQUE(account_id,date)) STRICT;
 CREATE INDEX valuation_account_date ON account_valuations(account_id,date DESC);
+`},
+  {version:5,name:'待收款与分次归还',sql:`
+CREATE TABLE receivables (id TEXT PRIMARY KEY, person TEXT NOT NULL, principal_minor INTEGER NOT NULL CHECK(principal_minor>0), outstanding_minor INTEGER NOT NULL CHECK(outstanding_minor>=0 AND outstanding_minor<=principal_minor), source_account_id TEXT NOT NULL REFERENCES accounts(id), default_return_account_id TEXT REFERENCES accounts(id), lent_date TEXT NOT NULL, due_date TEXT, status TEXT NOT NULL CHECK(status IN('OPEN','SETTLED')), note TEXT NOT NULL DEFAULT '', outbound_transaction_id TEXT UNIQUE NOT NULL REFERENCES transactions(id), revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, CHECK(due_date IS NULL OR due_date>=lent_date)) STRICT;
+CREATE TABLE receivable_repayments (id TEXT PRIMARY KEY, receivable_id TEXT NOT NULL REFERENCES receivables(id), amount_minor INTEGER NOT NULL CHECK(amount_minor>0), destination_account_id TEXT NOT NULL REFERENCES accounts(id), date TEXT NOT NULL, transaction_id TEXT UNIQUE NOT NULL REFERENCES transactions(id), note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL) STRICT;
+CREATE INDEX receivable_status_due ON receivables(status,due_date);
+CREATE INDEX receivable_person ON receivables(person);
+CREATE INDEX repayment_receivable_date ON receivable_repayments(receivable_id,date);
 `}
 ];
-export const currentSchema = 4;
+export const currentSchema = 5;

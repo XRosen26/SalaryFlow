@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $mobileRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $androidRoot = Join-Path $mobileRoot 'android'
+$appVersion = (Get-Content -Raw -LiteralPath (Join-Path $mobileRoot 'package.json') | ConvertFrom-Json).version
 
 Push-Location $mobileRoot
 try {
@@ -48,7 +49,7 @@ try {
   $releaseRoot = Join-Path $mobileRoot 'release'
   New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
   Get-ChildItem -LiteralPath $releaseRoot -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.apk', '.sha256' } | Remove-Item -Force
-  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-0.4.0-preview-$Architecture.apk"
+  $outputApk = Join-Path $releaseRoot "SalaryFlow-Android-$appVersion-preview-$Architecture.apk"
   Copy-Item -LiteralPath $builtApk -Destination $outputApk -Force
   $hash = (Get-FileHash -LiteralPath $outputApk -Algorithm SHA256).Hash
   "$hash  $(Split-Path -Leaf $outputApk)" | Set-Content -LiteralPath "$outputApk.sha256" -Encoding ascii

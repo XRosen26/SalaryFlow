@@ -92,7 +92,7 @@ try {
     .locator("nav")
     .getByRole("button", { name: "统计分析", exact: true })
     .click();
-  await page.getByLabel("饼图分析维度").waitFor();
+  await page.getByLabel("图表分析维度").waitFor();
   await page.getByRole("heading", { name: "收入结构", exact: true }).waitFor();
   await page.getByText("查看精确日期数据", { exact: true }).click();
   assert.equal(await page.locator(".chart-data tbody tr").count(), 2);
@@ -102,8 +102,8 @@ try {
   await page.getByLabel("趋势图形式").selectOption("line");
   assert.equal(await page.locator(".chart-v4 svg polyline").count(), 1);
   for (const dimension of ["income", "assets", "expense"]) {
-    await page.getByLabel("饼图分析维度").selectOption(dimension);
-    assert((await page.locator(".donut-layout circle").count()) > 1);
+    await page.getByLabel("图表分析维度").selectOption(dimension);
+    assert((await page.locator(".donut-layout .donut-segment").count()) > 0);
   }
   await page.getByLabel("趋势图形式").selectOption("bar");
   await page.getByLabel("趋势指标").selectOption("both");

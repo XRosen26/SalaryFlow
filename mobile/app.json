@@ -2,17 +2,23 @@
   "expo": {
     "name": "SalaryFlow",
     "slug": "salaryflow-mobile",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "salaryflow",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.xrosen26.salaryflow",
+      "buildNumber": "5",
+      "supportsTablet": true,
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "zh_CN"
+      }
     },
     "android": {
       "package": "com.xrosen26.salaryflow",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#155F4B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

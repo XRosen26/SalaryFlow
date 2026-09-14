@@ -123,6 +123,7 @@ try {
     ["预算与周期", "04-budget"],
     ["工资分配", "05-allocation"],
     ["我的账户", "06-accounts"],
+    ["待收款", "06-receivables"],
     ["统计分析", "07-analysis"],
     ["帮助与使用手册", "08-help"],
     ["设置与数据", "09-settings"],
@@ -140,6 +141,21 @@ try {
         await page.getByLabel("交易排序").inputValue(),
         "amount_desc",
       );
+      await page.getByRole("button", { name: "范围筛选", exact: true }).click();
+      await page.getByLabel("日期范围").selectOption("days3");
+      await page.getByLabel("最低金额（元）").fill("1");
+      await page.getByRole("button", { name: "应用筛选", exact: true }).click();
+      assert.equal(await page.getByLabel("日期范围").inputValue(), "days3");
+      await page.getByRole("button", { name: "清除范围", exact: true }).click();
+    }
+    if (name === "待收款") {
+      await page.getByRole("heading", { name: "待收款", exact: true, level: 1 }).waitFor();
+      await page.getByRole("button", { name: "新增待收款", exact: true }).click();
+      const receivableDialog = page.getByRole("dialog");
+      await receivableDialog.getByLabel("借给谁 / 对方名称").fill("桌面验收联系人");
+      await receivableDialog.getByLabel("借出金额（元）").fill("20+10");
+      await receivableDialog.getByRole("button", { name: "确认借出", exact: true }).click();
+      await page.getByText("桌面验收联系人", { exact: true }).waitFor();
     }
     if (name === "帮助与使用手册") {
       await page
@@ -341,13 +357,15 @@ try {
           "首次设置",
           "真实SQLite账本",
           "通过中文表单用金额算式新增支出",
-          "七个主页面（含独立工资分配）",
+          "九个一级页面（含独立工资分配与待收款）",
           "固定账单弹层",
           "浅深主题",
           "1100px布局",
           "禁用控件原因悬停说明",
           "说明气泡自动避开卡片和窗口边界",
           "交易与预算列表排序",
+          "交易日期及金额范围筛选",
+          "待收款创建与统计隔离",
           "趋势金额与环形占比直接标签",
           "周期预算环形图和条形图",
           "六套配色与浅深主题实时更新圆环色板",

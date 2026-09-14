@@ -364,7 +364,7 @@ export default function SettingsScreen() {
           <Text
             style={[styles.rowDescription, { color: colors.textSecondary }]}
           >
-            可跟随 Android 系统，也可固定使用浅色或深色。
+            可跟随系统，也可固定使用浅色或深色。
           </Text>
           <View accessibilityRole="radiogroup" style={styles.modeGrid}>
             {themeModeOptions.map((item) => {
@@ -441,7 +441,7 @@ export default function SettingsScreen() {
           <SettingRow
             icon="share-outline"
             title="导出完整备份"
-            description="生成含完整账本的 JSON，通过 Android 系统面板保存或发送。"
+            description="生成含完整账本的 JSON，通过系统分享面板保存或发送。"
             onPress={() => void exportData()}
           />
           <Divider />

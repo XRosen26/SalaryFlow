@@ -17,3 +17,4 @@ backup-status.json
 location.json
 SalaryFlow-data/
 .cache/
+mobile/dist-ios/

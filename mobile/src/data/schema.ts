@@ -1,4 +1,4 @@
-export const DATABASE_VERSION = 1;
+export const DATABASE_VERSION = 2;
 
 export const schemaSql = `
 PRAGMA journal_mode = WAL;
@@ -203,6 +203,38 @@ CREATE TABLE IF NOT EXISTS external_keys (
   transaction_id TEXT NOT NULL REFERENCES transactions(id),
   PRIMARY KEY(source,account_key,external_id)
 ) STRICT;
+
+CREATE TABLE IF NOT EXISTS receivables (
+  id TEXT PRIMARY KEY,
+  person TEXT NOT NULL,
+  principal_minor INTEGER NOT NULL CHECK(principal_minor>0),
+  outstanding_minor INTEGER NOT NULL CHECK(outstanding_minor>=0 AND outstanding_minor<=principal_minor),
+  source_account_id TEXT NOT NULL REFERENCES accounts(id),
+  default_return_account_id TEXT REFERENCES accounts(id),
+  lent_date TEXT NOT NULL,
+  due_date TEXT,
+  status TEXT NOT NULL CHECK(status IN('OPEN','SETTLED')),
+  note TEXT NOT NULL DEFAULT '',
+  outbound_transaction_id TEXT UNIQUE NOT NULL REFERENCES transactions(id),
+  revision INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK(due_date IS NULL OR due_date>=lent_date)
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS receivable_repayments (
+  id TEXT PRIMARY KEY,
+  receivable_id TEXT NOT NULL REFERENCES receivables(id),
+  amount_minor INTEGER NOT NULL CHECK(amount_minor>0),
+  destination_account_id TEXT NOT NULL REFERENCES accounts(id),
+  date TEXT NOT NULL,
+  transaction_id TEXT UNIQUE NOT NULL REFERENCES transactions(id),
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+) STRICT;
+CREATE INDEX IF NOT EXISTS receivable_status_due ON receivables(status,due_date);
+CREATE INDEX IF NOT EXISTS receivable_person ON receivables(person);
+CREATE INDEX IF NOT EXISTS repayment_receivable_date ON receivable_repayments(receivable_id,date);
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY,

@@ -38,10 +38,22 @@ const topics = [
     "Salary allocation is a main page. After marking salary income, it uses remaining budget and the primary spending balance to calculate a top-up and direct the remainder to savings or investments. It never operates a bank. Budgets can use salary cycles or calendar months, with immediate, next-period or specified-date changes.",
   ],
   [
+    "待收款与归还",
+    "Receivables & repayments",
+    "待收款用于记录借给他人的临时资金。对方必填，预计归还日可选；可分次归还并选择回款账户。借出与归还只改变账户和待收余额，不计收入、支出、预算执行率或储蓄率。",
+    "Receivables track temporary lending. The person is required and the due date is optional. Partial repayments can use any destination account. Lending and repayment change account cash and the outstanding balance, but not income, spending, budgets, or the savings rate.",
+  ],
+  [
+    "交易范围筛选",
+    "Transaction range filters",
+    "交易记录可同时使用快捷或自定义日期、最低/最高金额、类型、账户、分类、搜索和排序。日期结束值按所选当天完整包含，金额按绝对值筛选。",
+    "Transactions can combine quick or custom dates, minimum/maximum amounts, type, account, category, search, and sort. The selected end date is inclusive, and amount filters use absolute values.",
+  ],
+  [
     "统计分析与空数据",
     "Analytics & empty ranges",
-    "分析按交易实际发生日期统计。选择包含记录的时间范围；期初、校准、转账不会产生收支图。趋势只画截至今天的数据，可选柱状/折线、单独净支出及日期粒度；环形图可切换支出、收入和当前正余额账户。还可查看前一等长区间比较。退款可使净支出为负。",
-    "Analytics use actual transaction dates. Choose a range containing your records. Opening balances, adjustments and transfers do not create income or spending. Trends plot elapsed dates only. Choose bars or lines, net spending alone, and date grouping. Donut charts show spending, income or current positive account balances. Compare the preceding equal-length range. Refunds can make net spending negative.",
+    "分析按交易实际发生日期统计，可快速查看今日、最近3天等范围。期初、校准、转账和待收款不会产生收支图。趋势只画截至今天的数据，可选柱状/折线、单独净支出及日期粒度；构成图可切换支出、收入、收入与净支出、当前周期预算和正余额账户，并可使用环形图或条形图。还可查看前一等长区间比较。退款可使净支出为负。",
+    "Analytics use actual transaction dates and include quick ranges such as today and the last three days. Opening balances, adjustments, transfers, and receivables do not create income or spending. Trends plot elapsed dates only. Choose bars or lines, net spending alone, and date grouping. Composition charts cover spending, income, income versus net spending, the selected period budget, and positive account balances in donut or bar form. Compare the preceding equal-length range. Refunds can make net spending negative.",
   ],
   [
     "数据目录、升级和备份",
@@ -64,8 +76,8 @@ const topics = [
   [
     "关于本程序",
     "About this application",
-    "薪流 SalaryFlow 0.7.2 是持续迭代的本地优先个人预算、现金流与资产管理产品，当前提供 Windows 桌面端和 Android 端。两个平台分别针对大屏与触屏设计，并共享整数金额、交易、预算和统计口径；未来新增平台也将沿用同一原则。",
-    "SalaryFlow 0.7.2 is an evolving, local-first personal budgeting, cash-flow, and asset management product for Windows and Android. Each app is tailored to its screen and input model while sharing integer-money, transaction, budget, and analytics rules. Future platforms will follow the same principles.",
+    "薪流 SalaryFlow 0.8.0 是持续迭代的本地优先个人预算、现金流与资产管理产品，当前提供 Windows 桌面端和 Android 预览版，iOS 共用工程已搭建。各平台按屏幕与输入方式设计，并共享整数金额、交易、预算和统计口径。",
+    "SalaryFlow 0.8.0 is an evolving, local-first personal budgeting, cash-flow, and asset management product. Windows and Android are available today, while the shared iOS project is ready for macOS/Xcode packaging. All platforms use the same integer-money, transaction, budget, and analytics rules.",
   ],
 ];
 export function Help() {

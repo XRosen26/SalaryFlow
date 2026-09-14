@@ -1,5 +1,12 @@
 # 薪流 SalaryFlow · 技术、数据库与验证设计
 
+## 0.8.0实现补充
+
+数据库schema 5新增`receivables`与`receivable_repayments`。每次借出/归还与一条`ADJUSTMENT`资金记录一一关联，在同一SQLite事务内写入；报表只聚合INCOME/EXPENSE/REFUND，因此不会污染收支。金额仍为整数分，余额不足、超额归还、日期和revision均在提交前校验。
+
+移动schema 2采用相同两表和资金口径。Android/iOS共用Expo SDK 57工程、SQLite仓储和页面代码；iOS使用固定Bundle ID `com.xrosen26.salaryflow`，当前Windows环境完成bundle导出，原生签名留给macOS/Xcode。
+
+
 0.5增量：settings JSON增加amount_visibility，包含master、overview三卡和动态account id映射，兼容旧hide_amounts；显示判定不参与金额计算。setPayday以IMMEDIATE/NEXT_WEEK显式模式更新开放周期和cycle_rules，事务内验证交易范围及结算快照。resetLedger在主进程原生二次确认后关闭SQLite，限定路径删除主库/WAL/SHM和可选的SalaryFlow命名备份，再创建空账本并重载；schema保持3。
 
 0.4增量：core/charts.mjs用BigInt完成日期分组与饼图合计，src/Charts.tsx负责本地SVG图表及交互；仅坐标/比例映射使用Number，财务金额标签由整数分字符串格式化。settings JSON增加palette（六值白名单），不更改schema或既有迁移。视图配色不参与财务计算。

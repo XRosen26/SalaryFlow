@@ -21,7 +21,7 @@ import {
   ProgressBar,
   SectionHeader,
 } from "@/components/ui";
-import { spacing, useAppTheme } from "@/constants/theme";
+import { radius, spacing, useAppTheme } from "@/constants/theme";
 import { useFinance } from "@/data/finance-context";
 import { addDays } from "@/domain/dates";
 import { budgetTone, formatMoney } from "@/domain/money";
@@ -54,13 +54,32 @@ export default function HomeScreen() {
     snapshot.summary.netExpenseMinor,
     snapshot.summary.budgetMinor,
   );
+  const remaining = snapshot.summary.remainingBudgetMinor;
+  const safeState =
+    remaining < 0
+      ? {
+          title: "本期预算已超支",
+          hint: `已超支 ${formatMoney(Math.abs(remaining))}，建议暂停非必要支出`,
+          amount: Math.abs(remaining),
+        }
+      : remaining === 0 && snapshot.summary.budgetMinor > 0
+        ? {
+            title: "本期预算已用完",
+            hint: "可用预算为 0，请留意后续支出",
+            amount: 0,
+          }
+        : {
+            title: "当前可安心支出",
+            hint: "按预算与账户真实余额共同约束",
+            amount: safe,
+          };
   const topBudgets = snapshot.budgets.slice(0, width >= 700 ? 6 : 4);
   const recent = snapshot.transactions.slice(0, 5);
 
   const explainSafe = () =>
     Alert.alert(
-      "当前可安心支出",
-      "取“本期剩余预算”和“主要消费账户可用余额”中较小的非负值。预算是计划额度，账户余额是真实资金，两者不会互相替代；转账到消费账户只改变资金位置，不会增加预算。",
+      safeState.title,
+      "预算未用完时，取“本期剩余预算”和“主要消费账户可用余额”中较小的非负值；用完或超支后会切换为预算提醒。预算是计划额度，账户余额是真实资金，两者不会互相替代；转账到消费账户只改变资金位置，不会增加预算。",
     );
 
   const goAdd = (kind: "EXPENSE" | "INCOME" | "TRANSFER") => {
@@ -132,9 +151,9 @@ export default function HomeScreen() {
       >
         <View style={styles.heroTop}>
           <View>
-            <Text style={styles.heroLabel}>当前可安心支出</Text>
+            <Text style={styles.heroLabel}>{safeState.title}</Text>
             <MoneyAmount
-              value={safe}
+              value={safeState.amount}
               hidden={hidden}
               size={34}
               color="#FFFFFF"
@@ -149,7 +168,7 @@ export default function HomeScreen() {
             <Ionicons name="help-circle-outline" size={24} color="#FFFFFF" />
           </Pressable>
         </View>
-        <Text style={styles.heroHint}>按预算与账户真实余额共同约束</Text>
+        <Text style={styles.heroHint}>{safeState.hint}</Text>
         <Divider />
         <View style={styles.heroFacts}>
           <View style={styles.heroFact}>
@@ -175,6 +194,22 @@ export default function HomeScreen() {
           {snapshot.cycle.start} — {addDays(snapshot.cycle.end, -1)}
         </Text>
       </Card>
+
+      {(snapshot.summary.receivableOverdueCount > 0 || snapshot.summary.receivableDueTodayCount > 0) ? (
+        <Pressable onPress={() => router.push("/receivables" as never)}
+          style={[styles.receivableNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="alert-circle-outline" size={22} color={snapshot.summary.receivableOverdueCount ? colors.expense : colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.itemTitle, { color: colors.text }]}>
+              {snapshot.summary.receivableOverdueCount ? "有待收款已逾期" : "有待收款今日到期"}
+            </Text>
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+              {snapshot.summary.receivableOverdueCount ? snapshot.summary.receivableOverdueCount + " 笔已超过预计归还日" : snapshot.summary.receivableDueTodayCount + " 笔预计今天归还"}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        </Pressable>
+      ) : null}
 
       <View style={styles.quickRow}>
         <IconButton
@@ -206,6 +241,11 @@ export default function HomeScreen() {
           name="calendar-outline"
           label="固定账单"
           onPress={() => router.push("/bills" as never)}
+        />
+        <IconButton
+          name="people-outline"
+          label="待收款"
+          onPress={() => router.push("/receivables" as never)}
         />
       </View>
 
@@ -379,6 +419,7 @@ const styles = StyleSheet.create({
   },
   itemTitle: { fontSize: 15, fontWeight: "700" },
   amountPair: { fontSize: 12, fontVariant: ["tabular-nums"] },
+  receivableNotice: { minHeight: 66, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   transactionRow: {
     minHeight: 70,
     paddingHorizontal: spacing.lg,

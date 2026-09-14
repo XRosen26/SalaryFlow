@@ -1,4 +1,9 @@
-# 薪流 Android 技术与数据设计
+# 薪流移动端技术与数据设计
+
+## 0.5.0跨平台补充
+
+Expo SDK 57、React Native、Expo Router与Expo SQLite由Android/iOS共用。移动schema 2增加待收款与分次归还表；借出/回款使用关联余额调整，排除收支统计。iOS Bundle ID为`com.xrosen26.salaryflow`，bundle已在Windows验证；原生构建、签名和IPA必须在macOS/Xcode完成。
+
 
 版本：0.4　更新：2026-09-13
 

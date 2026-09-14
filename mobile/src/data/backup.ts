@@ -22,6 +22,8 @@ const TABLES = [
   "allocation_items",
   "imports",
   "external_keys",
+  "receivables",
+  "receivable_repayments",
   "schema_migrations",
 ] as const;
 
@@ -36,7 +38,7 @@ type BackupBase = {
   formatVersion: 1;
   schemaVersion: 4;
   createdAt: string;
-  source: { platform: "android"; appVersion: "0.2.0" };
+  source: { platform: "mobile"; appVersion: "0.5.0" };
   tables: Record<TableName, BackupRow[]>;
 };
 
@@ -65,7 +67,7 @@ export async function buildBackup(db: SQLiteDatabase): Promise<BackupDocument> {
     formatVersion: 1,
     schemaVersion: 4,
     createdAt: new Date().toISOString(),
-    source: { platform: "android", appVersion: "0.2.0" },
+    source: { platform: "mobile", appVersion: "0.5.0" },
     tables,
   };
   return {
@@ -90,7 +92,7 @@ export async function writeBackup(db: SQLiteDatabase, recovery = false) {
     directory.create({ intermediates: true, idempotent: true });
   const file = new File(
     directory,
-    backupName(recovery ? "Recovery" : "SalaryFlow-Android"),
+    backupName(recovery ? "Recovery" : "SalaryFlow-Mobile"),
   );
   file.create({ overwrite: true, intermediates: true });
   file.write(JSON.stringify(backup, null, 2));
@@ -137,7 +139,7 @@ async function parseBackup(text: string): Promise<BackupDocument> {
   assertRecord(value.tables, "备份缺少数据表");
   assertRecord(value.integrity, "备份缺少完整性校验");
   for (const table of TABLES) {
-    if (!Array.isArray(value.tables[table]))
+    if (!Array.isArray(value.tables[table]) && !["receivables", "receivable_repayments"].includes(table))
       throw new Error(`备份缺少 ${table} 数据`);
   }
   const document = value as unknown as BackupDocument;
@@ -148,6 +150,8 @@ async function parseBackup(text: string): Promise<BackupDocument> {
   ) {
     throw new Error("备份完整性校验失败，文件可能已损坏或被修改");
   }
+  document.tables.receivables ??= [];
+  document.tables.receivable_repayments ??= [];
   return document;
 }
 

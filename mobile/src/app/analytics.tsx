@@ -16,7 +16,7 @@ import { loadAnalytics, type AnalyticsSnapshot } from "@/data/repository";
 import { addDays, today } from "@/domain/dates";
 import { formatMoney } from "@/domain/money";
 
-type Range = "CYCLE" | "7D" | "30D" | "90D" | "MONTH" | "YEAR";
+type Range = "CYCLE" | "TODAY" | "3D" | "7D" | "30D" | "90D" | "MONTH" | "YEAR";
 type Dimension = "EXPENSE" | "INCOME" | "BUDGET";
 type ChartView = "DONUT" | "BAR";
 type TrendSeries = "BOTH" | "INCOME" | "EXPENSE";
@@ -32,6 +32,8 @@ type ChartRow = {
 
 const rangeOptions: { id: Range; label: string }[] = [
   { id: "CYCLE", label: "本周期" },
+  { id: "TODAY", label: "今日" },
+  { id: "3D", label: "近3天" },
   { id: "7D", label: "近7天" },
   { id: "30D", label: "近30天" },
   { id: "90D", label: "近90天" },
@@ -92,6 +94,10 @@ export default function AnalyticsScreen() {
     const now = today();
     if (range === "CYCLE")
       return { start: snapshot.cycle.start, end: snapshot.cycle.end };
+    if (range === "TODAY")
+      return { start: now, end: addDays(now, 1) };
+    if (range === "3D")
+      return { start: addDays(now, -2), end: addDays(now, 1) };
     if (range === "7D")
       return { start: addDays(now, -6), end: addDays(now, 1) };
     if (range === "30D")
@@ -231,6 +237,14 @@ export default function AnalyticsScreen() {
       </View>
 
       <View style={styles.metrics}>
+        <Card style={styles.metric}>
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>今日支出</Text>
+          <MoneyAmount value={snapshot.summary.todayExpenseMinor} hidden={hidden} size={20} color={colors.expense} />
+        </Card>
+        <Card style={styles.metric}>
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>最近3天支出</Text>
+          <MoneyAmount value={snapshot.summary.threeDayExpenseMinor} hidden={hidden} size={20} color={colors.expense} />
+        </Card>
         <Card style={styles.metric}>
           <Text style={[styles.muted, { color: colors.textSecondary }]}>
             收入

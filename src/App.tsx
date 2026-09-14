@@ -97,6 +97,7 @@ const pages = [
   { key: "transactions", label: msg("交易记录"), icon: ArrowLeftRight },
   { key: "budget", label: msg("预算与周期"), icon: Wallet },
   { key: "allocations", label: msg("工资分配"), icon: Sparkles },
+  { key: "receivables", label: msg("待收款"), icon: Banknote },
   { key: "accounts", label: msg("我的账户"), icon: Landmark },
   { key: "analysis", label: msg("统计分析"), icon: ChartNoAxesCombined },
   { key: "help", label: msg("帮助与使用手册"), icon: CircleHelp },
@@ -108,6 +109,8 @@ const ranges = [
   ["month", msg("自然月")],
   ["quarter", msg("自然季度")],
   ["year", msg("自然年")],
+  ["today", msg("今日")],
+  ["days3", msg("最近3天")],
   ["days7", msg("最近7天")],
   ["days30", msg("最近30天")],
   ["days90", msg("最近90天")],
@@ -499,7 +502,15 @@ export default function App() {
     [settingsTab, setSettingsTab] = useState("general"),
     [budgetSort, setBudgetSort] = useState("default"),
     [expenseSort, setExpenseSort] = useState("amount_desc"),
-    [incomeSort, setIncomeSort] = useState("amount_desc");
+    [incomeSort, setIncomeSort] = useState("amount_desc"),
+    [transactionFiltersOpen, setTransactionFiltersOpen] = useState(false),
+    [transactionFilter, setTransactionFilter] = useState({
+      mode: "all",
+      start: "",
+      end: "",
+      min: "",
+      max: "",
+    });
   const [range, setRange] = useState("cycle"),
     [anchor, setAnchor] = useState(""),
     [custom, setCustom] = useState({ start: "", end: "" });
@@ -1042,6 +1053,43 @@ export default function App() {
       ),
     });
   }
+  function receivableForm() {
+    setModal({
+      title: msg("新增待收款"),
+      subtitle: msg("借出会减少所选账户余额，但不计入支出、预算或储蓄率。"),
+      body: <Form
+        fields={[
+          { name: "person", label: msg("借给谁 / 对方名称") },
+          { name: "amount", label: msg("借出金额（元）"), type: "money" },
+          selectField("source_account_id", msg("借出账户"), accountOptions),
+          selectField("default_return_account_id", msg("默认收回账户（可选）"), accountOptions, false),
+          { name: "lent_date", label: msg("借出日期"), type: "date" },
+          { name: "due_date", label: msg("预计归还日期（可选）"), type: "date", required: false },
+          { name: "note", label: msg("备注（可选）"), required: false },
+        ]}
+        initial={{ lent_date: data?.today, source_account_id: data?.settings.defaults?.SPENDING, default_return_account_id: data?.settings.defaults?.SPENDING }}
+        submit={msg("确认借出")}
+        onSubmit={async (p, op) => { await mutate("createReceivable", { ...p, amount_minor: parseMoneyExpression(p.amount) }, op); close(); }}
+      />,
+    });
+  }
+  function repayReceivable(row: Data) {
+    setModal({
+      title: msg("登记归还"),
+      subtitle: tr("{0} 当前待收 {1} 元；可分次归还，并选择实际回款账户。", row.person, money(row.outstanding_minor)),
+      body: <Form
+        fields={[
+          { name: "amount", label: msg("本次归还金额（元）"), type: "money" },
+          selectField("destination_account_id", msg("收回账户"), accountOptions),
+          { name: "date", label: msg("实际归还日期"), type: "date" },
+          { name: "note", label: msg("备注（可选）"), required: false },
+        ]}
+        initial={{ amount: decimal(row.outstanding_minor), destination_account_id: row.default_return_account_id || row.source_account_id, date: data?.today }}
+        submit={msg("确认已归还")}
+        onSubmit={async (p, op) => { await mutate("repayReceivable", { ...p, id: row.id, revision: row.revision, amount_minor: parseMoneyExpression(p.amount) }, op); close(); }}
+      />,
+    });
+  }
   function billForm(b: Data | null = null) {
     setModal({
       title: b ? msg("修改固定账单") : msg("新增固定账单"),
@@ -1264,7 +1312,7 @@ export default function App() {
                 {msg("恢复")}
               </button>
             ) : (
-              t.kind !== "OPENING" && (
+              !["OPENING", "ADJUSTMENT"].includes(t.kind) && (
                 <button
                   className="danger"
                   onClick={() =>
@@ -1671,6 +1719,14 @@ export default function App() {
             )}
           {page === "overview" && (
             <>
+              {(data.receivableSummary?.overdue > 0 || data.receivableSummary?.dueToday > 0) && (
+                <button className="receivable-alert" onClick={() => goto("receivables")}>
+                  <CircleHelp size={18} />
+                  <span><strong>{data.receivableSummary.overdue > 0 ? msg("有待收款已逾期") : msg("有待收款今日到期")}</strong>
+                  {data.receivableSummary.overdue > 0 ? tr("{0} 笔已超过预计归还日", data.receivableSummary.overdue) : tr("{0} 笔预计今天归还", data.receivableSummary.dueToday)}</span>
+                  <ChevronRight size={18} />
+                </button>
+              )}
               <div className="overview-top">
                 <section
                   className="hero-card"
@@ -1728,7 +1784,11 @@ export default function App() {
                     </span>
                     <span>
                       <small>
-                        {msg("当前可安心支出")}
+                        {BigInt(data.remainingBudget) < 0n
+                          ? msg("本期预算已超支")
+                          : BigInt(data.remainingBudget) === 0n && BigInt(data.totalBudget) > 0n
+                            ? msg("本期预算已用完")
+                            : msg("当前可安心支出")}
                         <InfoTip
                           text={msg(
                             "取本周期剩余预算与主要消费账户可用余额中较小的非负值",
@@ -2105,18 +2165,43 @@ export default function App() {
                     {query.deleted ? msg("查看正常交易") : msg("回收站")}
                   </button>
                   <button
-                    onClick={() =>
-                      setQuery({
-                        ...query,
-                        start: "1900-01-01",
-                        end: "2199-12-31",
-                        page: 0,
-                      })
-                    }
+                    className={transactionFiltersOpen ? "active" : ""}
+                    onClick={() => setTransactionFiltersOpen(!transactionFiltersOpen)}
                   >
-                    {msg("全部日期")}
+                    <CalendarDays size={15} />
+                    {msg("范围筛选")}
                   </button>
                 </div>
+                {transactionFiltersOpen && (
+                  <div className="range-filter-box">
+                    <select aria-label={msg("日期范围")} value={transactionFilter.mode} onChange={(e) => {
+                      const mode = e.target.value;
+                      const next = { ...transactionFilter, mode };
+                      if (mode === "all") { next.start = "1900-01-01"; next.end = "2199-12-30"; }
+                      else if (mode !== "custom") { const r = timeRange(mode, data.today); next.start = r.start; next.end = addDays(r.end, -1); }
+                      setTransactionFilter(next);
+                    }}>
+                      <option value="all">{msg("全部日期")}</option>
+                      <option value="today">{msg("今日")}</option>
+                      <option value="days3">{msg("最近3天")}</option>
+                      <option value="days7">{msg("最近7天")}</option>
+                      <option value="days30">{msg("最近30天")}</option>
+                      <option value="custom">{msg("自定义日期")}</option>
+                    </select>
+                    <label><span>{msg("开始日期")}</span><input type="date" value={transactionFilter.start} onChange={(e) => setTransactionFilter({ ...transactionFilter, mode: "custom", start: e.target.value })} /></label>
+                    <label><span>{msg("结束日期")}</span><input type="date" value={transactionFilter.end} onChange={(e) => setTransactionFilter({ ...transactionFilter, mode: "custom", end: e.target.value })} /></label>
+                    <label><span>{msg("最低金额（元）")}</span><input inputMode="decimal" value={transactionFilter.min} onChange={(e) => setTransactionFilter({ ...transactionFilter, min: e.target.value })} placeholder="0.00" /></label>
+                    <label><span>{msg("最高金额（元）")}</span><input inputMode="decimal" value={transactionFilter.max} onChange={(e) => setTransactionFilter({ ...transactionFilter, max: e.target.value })} placeholder={msg("不限")} /></label>
+                    <button className="primary" onClick={() => act(async () => {
+                      if (transactionFilter.start && transactionFilter.end && transactionFilter.start > transactionFilter.end) throw new Error(msg("开始日期不能晚于结束日期"));
+                      const min = transactionFilter.min ? parseMoneyExpression(transactionFilter.min, { zero: true }) : undefined;
+                      const max = transactionFilter.max ? parseMoneyExpression(transactionFilter.max, { zero: true }) : undefined;
+                      if (min !== undefined && max !== undefined && BigInt(min) > BigInt(max)) throw new Error(msg("最低金额不能大于最高金额"));
+                      setQuery({ ...query, start: transactionFilter.start || "1900-01-01", end: transactionFilter.end ? addDays(transactionFilter.end, 1) : "2199-12-31", min_amount: min, max_amount: max, page: 0 });
+                    })}>{msg("应用筛选")}</button>
+                    <button onClick={() => { setTransactionFilter({ mode: "all", start: "", end: "", min: "", max: "" }); setQuery({ ...query, start: "1900-01-01", end: "2199-12-31", min_amount: undefined, max_amount: undefined, page: 0 }); }}>{msg("清除范围")}</button>
+                  </div>
+                )}
                 {(query.category_id || query.category_version_id) && (
                   <div className="inline-notice">
                     {msg("按分类筛选中")}
@@ -2553,6 +2638,42 @@ export default function App() {
               format={fmt}
             />
           )}
+          {page === "receivables" && (
+            <>
+              <section className="panel">
+                <div className="panel-heading">
+                  <div>
+                    <h3>{msg("待收款")}</h3>
+                    <p>{msg("记录临时借出的资金；归还不计收入，借出不计支出。")}</p>
+                  </div>
+                  <button className="primary" onClick={receivableForm}><Plus size={16} />{msg("新增待收款")}</button>
+                </div>
+                <div className="analysis-stats compact-stats">
+                  <div><small>{msg("待收总额")}</small><strong>¥ {fmt(data.receivableSummary?.outstanding || "0")}</strong></div>
+                  <div><small>{msg("待收笔数")}</small><strong>{data.receivableSummary?.open || 0}</strong></div>
+                  <div><small>{msg("已逾期")}</small><strong>{data.receivableSummary?.overdue || 0}</strong></div>
+                  <div><small>{msg("今日到期")}</small><strong>{data.receivableSummary?.dueToday || 0}</strong></div>
+                </div>
+              </section>
+              <section className="panel">
+                {data.receivables?.length ? <div className="table-wrap"><table>
+                  <thead><tr><th>{msg("对方")}</th><th>{msg("借出账户")}</th><th>{msg("借出 / 预计归还")}</th><th className="align-right">{msg("本金")}</th><th className="align-right">{msg("仍待收")}</th><th>{msg("状态")}</th><th /></tr></thead>
+                  <tbody>{data.receivables.map((row: Data) => {
+                    const overdue = row.status === "OPEN" && row.due_date && row.due_date < data.today;
+                    return <tr key={row.id}>
+                      <td><strong>{row.person}</strong><small>{row.note || msg("无备注")}</small></td>
+                      <td>{row.source_account_name}</td>
+                      <td className="mono">{row.lent_date}<br /><span className={overdue ? "danger-text" : "muted"}>{row.due_date || msg("未设归还日")}</span></td>
+                      <td className="align-right money">¥ {fmt(row.principal_minor)}</td>
+                      <td className="align-right money">¥ {fmt(row.outstanding_minor)}</td>
+                      <td><span className={"tag " + (overdue ? "warn" : "neutral")}>{row.status === "SETTLED" ? msg("已结清") : overdue ? msg("已逾期") : msg("待归还")}</span></td>
+                      <td>{row.status === "OPEN" && <button onClick={() => repayReceivable(row)}>{msg("登记归还")}</button>}</td>
+                    </tr>;
+                  })}</tbody>
+                </table></div> : <Empty title={msg("暂无待收款")} hint={msg("朋友或亲人借款时，可记录对方、账户和可选归还日期。")} action={<button className="primary" onClick={receivableForm}>{msg("新增第一笔")}</button>} />}
+              </section>
+            </>
+          )}
           {page === "accounts" && (
             <>
               <div className="section-actions">
@@ -2967,6 +3088,8 @@ export default function App() {
               </section>
               <div className="analysis-stats">
                 {[
+                  [msg("今日支出"), data.quickExpense.today],
+                  [msg("最近3天支出"), data.quickExpense.days3],
                   [msg("收入"), data.report.income],
                   [msg("毛支出"), data.report.expense],
                   [msg("退款"), data.report.refund],
@@ -3509,12 +3632,12 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.7.2 · Windows 与 Android 本地个人预算、现金流和资产管理",
+                          "SalaryFlow 0.8.0 · Windows 与移动端本地个人预算、现金流和资产管理",
                         )}
                       </p>
                       <p>
                         {msg(
-                          "当前提供 Windows 桌面端与 Android 端，并分别针对大屏和触屏优化；数据保持本地，未来平台继续沿用一致的财务口径。",
+                          "当前提供 Windows 桌面端与 Android 预览版，iOS 共用工程已搭建；各平台按屏幕和输入方式优化，并沿用一致的财务口径。",
                         )}
                       </p>
                     </div>

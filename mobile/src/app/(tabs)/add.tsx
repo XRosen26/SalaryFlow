@@ -6,8 +6,10 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -165,6 +167,7 @@ export default function AddScreen() {
   const [note, setNote] = useState("");
   const [salary, setSalary] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [picker, setPicker] = useState<"category" | "source" | "destination" | null>(null);
 
   useEffect(() => {
     if (kinds.some((item) => item.id === params.kind))
@@ -191,12 +194,7 @@ export default function AddScreen() {
     setDestinationId(
       (current) => current || (kind === "TRANSFER" ? spending : salaryAccount),
     );
-    const categories = snapshot.categories.filter(
-      (category) =>
-        category.kind === (kind === "INCOME" ? "INCOME" : "EXPENSE"),
-    );
-
-    setCategoryId(categories[0]?.id ?? "");
+    setCategoryId("");
   }, [kind, params.id, snapshot]);
 
   useEffect(() => {
@@ -244,6 +242,9 @@ export default function AddScreen() {
     },
     {},
   );
+  const selectedCategory = categories.find((item) => item.id === categoryId);
+  const selectedSource = snapshot.accounts.find((item) => item.id === sourceId);
+  const selectedDestination = snapshot.accounts.find((item) => item.id === destinationId);
 
   const changeKind = (next: EntryKind) => {
     setKind(next);
@@ -264,11 +265,7 @@ export default function AddScreen() {
       "";
     setSourceId(next === "TRANSFER" ? salaryAccount : spending);
     setDestinationId(next === "TRANSFER" ? spending : salaryAccount);
-    const nextCategories = snapshot.categories.filter(
-      (category) =>
-        category.kind === (next === "INCOME" ? "INCOME" : "EXPENSE"),
-    );
-    setCategoryId(nextCategories[0]?.id ?? "");
+    setCategoryId("");
   };
 
   const appendOperator = (operator: string) => {
@@ -334,7 +331,7 @@ export default function AddScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <AppScreen>
         <PageHeader
@@ -385,66 +382,29 @@ export default function AddScreen() {
           <View style={styles.field}>
             <View style={styles.categoryHeader}>
               <View style={styles.categoryHeaderText}>
-                <Text style={[styles.fieldTitle, { color: colors.text }]}>
-                  分类
-                </Text>
-                <Text
-                  style={[styles.categoryHint, { color: colors.textSecondary }]}
-                >
-                  按分组展示全部可用分类，图标帮助快速定位。
-                </Text>
+                <Text style={[styles.fieldTitle, { color: colors.text }]}>分类</Text>
+                <Text style={[styles.categoryHint, { color: colors.textSecondary }]}>先选分类，选中后自动收起，再填写金额。</Text>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push("/categories" as never)}
-                hitSlop={8}
-              >
-                <Text
-                  style={[styles.manageCategories, { color: colors.primary }]}
-                >
-                  管理分类 ›
-                </Text>
+              <Pressable onPress={() => router.push("/categories" as never)} hitSlop={8}>
+                <Text style={[styles.manageCategories, { color: colors.primary }]}>管理分类 ›</Text>
               </Pressable>
             </View>
-            {Object.entries(categoryGroups).map(([group, items]) => (
-              <View key={group} style={styles.categoryGroup}>
-                <Text
-                  style={[
-                    styles.categoryGroupName,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {group}
-                </Text>
-                <View
-                  accessibilityRole="radiogroup"
-                  style={styles.categoryGrid}
-                >
-                  {items.map((category) => (
-                    <CategoryTile
-                      key={category.id}
-                      name={category.name}
-                      group={category.groupName}
-                      selected={categoryId === category.id}
-                      onPress={() => setCategoryId(category.id)}
-                    />
-                  ))}
-                </View>
+            <Pressable onPress={() => setPicker("category")}
+              style={[styles.selector, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.categoryIcon, { backgroundColor: colors.primarySoft }]}>
+                <Ionicons name={categoryIcon(selectedCategory?.name ?? "", selectedCategory?.groupName ?? "")} size={20} color={colors.primary} />
               </View>
-            ))}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.selectorValue, { color: colors.text }]}>{selectedCategory?.name ?? "选择分类"}</Text>
+                <Text style={[styles.selectorMeta, { color: colors.textSecondary }]}>{selectedCategory?.groupName ?? "点击展开全部分类"}</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </Pressable>
           </View>
         ) : (
-          <View
-            style={[styles.notice, { backgroundColor: colors.primarySoft }]}
-          >
-            <Ionicons
-              name="information-circle-outline"
-              size={20}
-              color={colors.primary}
-            />
-            <Text style={[styles.noticeText, { color: colors.text }]}>
-              转账只移动账户资金，不计作收入、支出或储蓄。
-            </Text>
+          <View style={[styles.notice, { backgroundColor: colors.primarySoft }]}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+            <Text style={[styles.noticeText, { color: colors.text }]}>转账只移动账户资金，不计作收入、支出或储蓄。</Text>
           </View>
         )}
 
@@ -508,39 +468,31 @@ export default function AddScreen() {
 
         {kind !== "INCOME" ? (
           <View style={styles.field}>
-            <Text style={[styles.fieldTitle, { color: colors.text }]}>
-              付款账户
-            </Text>
-            <View style={styles.chips}>
-              {snapshot.accounts.map((account) => (
-                <Chip
-                  key={account.id}
-                  label={account.name}
-                  selected={sourceId === account.id}
-                  onPress={() => setSourceId(account.id)}
-                />
-              ))}
-            </View>
+            <Text style={[styles.fieldTitle, { color: colors.text }]}>付款账户</Text>
+            <Pressable onPress={() => setPicker("source")}
+              style={[styles.selector, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="wallet-outline" size={22} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.selectorValue, { color: colors.text }]}>{selectedSource?.name ?? "选择付款账户"}</Text>
+                <Text style={[styles.selectorMeta, { color: colors.textSecondary }]}>点击更换账户</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </Pressable>
           </View>
         ) : null}
 
         {kind !== "EXPENSE" ? (
           <View style={styles.field}>
-            <Text style={[styles.fieldTitle, { color: colors.text }]}>
-              {kind === "INCOME" ? "收款账户" : "转入账户"}
-            </Text>
-            <View style={styles.chips}>
-              {snapshot.accounts
-                .filter((account) => account.id !== sourceId)
-                .map((account) => (
-                  <Chip
-                    key={account.id}
-                    label={account.name}
-                    selected={destinationId === account.id}
-                    onPress={() => setDestinationId(account.id)}
-                  />
-                ))}
-            </View>
+            <Text style={[styles.fieldTitle, { color: colors.text }]}>{kind === "INCOME" ? "收款账户" : "转入账户"}</Text>
+            <Pressable onPress={() => setPicker("destination")}
+              style={[styles.selector, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="wallet-outline" size={22} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.selectorValue, { color: colors.text }]}>{selectedDestination?.name ?? "选择收款账户"}</Text>
+                <Text style={[styles.selectorMeta, { color: colors.textSecondary }]}>点击更换账户</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </Pressable>
           </View>
         ) : null}
 
@@ -583,6 +535,41 @@ export default function AddScreen() {
             ]}
           />
         </View>
+
+        <Modal visible={picker !== null} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
+          <Pressable style={styles.pickerBackdrop} onPress={() => setPicker(null)}>
+            <Pressable style={[styles.pickerSheet, { backgroundColor: colors.background }]} onPress={(event) => event.stopPropagation()}>
+              <View style={styles.pickerHead}>
+                <View>
+                  <Text style={[styles.pickerTitle, { color: colors.text }]}>{picker === "category" ? "选择分类" : picker === "source" ? "选择付款账户" : "选择收款账户"}</Text>
+                  <Text style={[styles.pickerHint, { color: colors.textSecondary }]}>选择后将自动返回记账表单</Text>
+                </View>
+                <Pressable onPress={() => setPicker(null)} hitSlop={10}><Ionicons name="close" size={24} color={colors.textSecondary} /></Pressable>
+              </View>
+              <ScrollView contentContainerStyle={styles.pickerContent} keyboardShouldPersistTaps="handled">
+                {picker === "category" ? Object.entries(categoryGroups).map(([group, items]) => (
+                  <View key={group} style={styles.categoryGroup}>
+                    <Text style={[styles.categoryGroupName, { color: colors.textSecondary }]}>{group}</Text>
+                    <View style={styles.categoryGrid}>{items.map((category) => (
+                      <CategoryTile key={category.id} name={category.name} group={category.groupName}
+                        selected={categoryId === category.id} onPress={() => { setCategoryId(category.id); setPicker(null); setTimeout(() => amountRef.current?.focus(), 250); }} />
+                    ))}</View>
+                  </View>
+                )) : snapshot.accounts.filter((account) => picker !== "destination" || account.id !== sourceId).map((account) => {
+                  const selected = picker === "source" ? sourceId === account.id : destinationId === account.id;
+                  return <Pressable key={account.id} onPress={() => {
+                    if (picker === "source") setSourceId(account.id); else setDestinationId(account.id);
+                    setPicker(null);
+                  }} style={[styles.accountOption, { backgroundColor: selected ? colors.primarySoft : colors.surface, borderColor: selected ? colors.primary : colors.border }]}>
+                    <Ionicons name="wallet-outline" size={21} color={colors.primary} />
+                    <Text style={[styles.accountOptionText, { color: colors.text }]}>{account.name}</Text>
+                    {selected ? <Ionicons name="checkmark-circle" size={20} color={colors.primary} /> : null}
+                  </Pressable>;
+                })}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         <Pressable
           accessibilityRole="button"
@@ -649,6 +636,17 @@ const styles = StyleSheet.create({
   field: { gap: spacing.sm },
   fieldTitle: { fontSize: 15, fontWeight: "800" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  selector: { minHeight: 64, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  selectorValue: { fontSize: 15, fontWeight: "800" },
+  selectorMeta: { fontSize: 11, marginTop: 3 },
+  pickerBackdrop: { flex: 1, backgroundColor: "rgba(9,18,25,0.55)", justifyContent: "flex-end" },
+  pickerSheet: { maxHeight: "78%", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: spacing.lg, paddingHorizontal: spacing.lg, paddingBottom: 24 },
+  pickerHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.md },
+  pickerTitle: { fontSize: 20, fontWeight: "900" },
+  pickerHint: { fontSize: 12, marginTop: 4 },
+  pickerContent: { gap: spacing.lg, paddingBottom: 36 },
+  accountOption: { minHeight: 56, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm },
+  accountOptionText: { flex: 1, fontSize: 15, fontWeight: "800" },
   categoryHeader: {
     flexDirection: "row",
     alignItems: "flex-start",

@@ -23,6 +23,7 @@ type DateFieldProps = {
   label?: string;
   hint?: string;
   style?: StyleProp<ViewStyle>;
+  optional?: boolean;
 };
 
 function monthCells(monthStart: string) {
@@ -46,6 +47,7 @@ export function DateField({
   label,
   hint = "可直接输入：2026-09-13、2026年9月13日或20260913",
   style,
+  optional = false,
 }: DateFieldProps) {
   const colors = useAppTheme();
   const [open, setOpen] = useState(false);
@@ -62,6 +64,7 @@ export function DateField({
   const [year, monthNumber] = month.split("-").map(Number);
 
   const normalize = () => {
+    if (optional && !value.trim()) { setError(""); return ""; }
     try {
       const next = normalizeDateInput(value);
       onChange(next);
