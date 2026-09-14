@@ -12,12 +12,12 @@ import { loadTransactions, type TransactionItem } from "@/data/repository";
 import { addDays, normalizeDateInput, today } from "@/domain/dates";
 import { parseMoneyExpression } from "@/domain/money";
 
-type Filter = "ALL" | TransactionItem["kind"];
+type Filter = "ALL" | TransactionItem["kind"] | "RECEIVABLE";
 type Sort = "DATE_DESC" | "DATE_ASC" | "AMOUNT_DESC" | "AMOUNT_ASC" | "CATEGORY";
 const filters: { id: Filter; label: string }[] = [
   { id: "ALL", label: "全部" }, { id: "EXPENSE", label: "支出" },
   { id: "INCOME", label: "收入" }, { id: "TRANSFER", label: "转账" },
-  { id: "REFUND", label: "退款" },
+  { id: "REFUND", label: "退款" }, { id: "RECEIVABLE", label: "待收款" },
 ];
 
 export default function TransactionsScreen() {
@@ -156,15 +156,18 @@ export default function TransactionsScreen() {
             <Text style={[styles.emptyTitle, { color: colors.text }]}>没有匹配的交易</Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>换一个筛选条件，或从“记一笔”新增。</Text></View>
         ) : rows.map((item, index) => {
-          const positive = item.kind === "INCOME" || item.kind === "REFUND";
+          const receivable = Boolean(item.receivableId);
+          const positive = item.kind === "INCOME" || item.kind === "REFUND" || item.receivableDirection === "REPAID";
           const transfer = item.kind === "TRANSFER";
-          const title = transfer ? "账户转账" : (item.categoryName ?? (item.kind === "ADJUSTMENT" ? "余额调整" : item.kind));
+          const title = receivable
+            ? `${item.receivableDirection === "LENT" ? "待收借出" : "待收归还"} · ${item.receivablePerson}`
+            : transfer ? "账户转账" : (item.categoryName ?? (item.kind === "ADJUSTMENT" ? "余额调整" : item.kind));
           const account = transfer ? String(item.sourceName) + " → " + String(item.destinationName) : (item.sourceName ?? item.destinationName);
           return <View key={item.id}>{index ? <Divider /> : null}
             <Pressable onPress={() => router.push(("/transaction-detail?id=" + item.id) as never)}
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.68 }]}>
               <View style={[styles.icon, { backgroundColor: positive ? colors.primarySoft : colors.surfaceMuted }]}>
-                <Ionicons name={transfer ? "swap-horizontal" : positive ? "arrow-down" : "arrow-up"} size={18} color={positive ? colors.income : colors.expense} />
+                <Ionicons name={receivable ? "cash-outline" : transfer ? "swap-horizontal" : positive ? "arrow-down" : "arrow-up"} size={18} color={positive ? colors.income : colors.expense} />
               </View>
               <View style={styles.text}><Text style={[styles.title, { color: colors.text }]}>{title}</Text>
                 <Text numberOfLines={1} style={[styles.meta, { color: colors.textSecondary }]}>

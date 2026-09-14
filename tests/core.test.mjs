@@ -82,9 +82,9 @@ test("工资周期与全部滚动时间边界", () => {
     }),
   );
 });
-test("初始化模板6310元，重复初始化回滚", (t) => {
+test("初始化模板9870元，重复初始化回滚", (t) => {
   const { store } = fixture(t);
-  assert.equal(store.snapshot().totalBudget, "631000");
+  assert.equal(store.snapshot().totalBudget, "987000");
   assert.throws(() => store.command("initialize", {}));
   assert.equal(store.snapshot().accounts.length, 3);
 });
@@ -193,7 +193,7 @@ test("三层预算互不回写，软删和恢复重算", (t) => {
   assert.equal(s.totalBudget, "2000");
   assert.equal(
     s.defaultBudget.items.reduce((n, x) => n + BigInt(x.amount_minor), 0n),
-    631000n,
+    987000n,
   );
   const tx = record("EXPENSE", 100);
   store.command("deleteTransaction", { id: tx.id, revision: 1 });

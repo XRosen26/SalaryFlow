@@ -376,6 +376,13 @@ export default function AddScreen() {
               </Pressable>
             );
           })}
+          {!params.id ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="新增待收款"
+              onPress={() => router.push("/receivables?create=1" as never)} style={styles.segmentItem}>
+              <Ionicons name="cash-outline" size={18} color={colors.textSecondary} />
+              <Text style={[styles.segmentText, { color: colors.textSecondary }]}>待收款</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {kind !== "TRANSFER" ? (

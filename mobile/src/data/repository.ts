@@ -55,6 +55,9 @@ export type TransactionItem = {
   destinationId: string | null;
   categoryId: string | null;
   originalId: string | null;
+  receivableId?: string | null;
+  receivablePerson?: string | null;
+  receivableDirection?: "LENT" | "REPAID" | null;
 };
 
 export type BudgetItem = {
@@ -134,15 +137,15 @@ const categorySeeds = [
 ] as const;
 
 const defaultBudget: Record<string, number> = {
-  "expense-rent": 185000,
-  "expense-grocery": 50000,
-  "expense-dining": 100000,
-  "expense-transport": 20000,
-  "expense-daily": 15000,
-  "expense-social": 30000,
-  "expense-study": 30000,
-  "expense-medical": 10000,
-  "expense-other": 20000,
+  "expense-rent": 240000,
+  "expense-grocery": 70000,
+  "expense-dining": 120000,
+  "expense-transport": 36000,
+  "expense-daily": 24000,
+  "expense-social": 52000,
+  "expense-study": 65000,
+  "expense-medical": 26000,
+  "expense-other": 48000,
 };
 
 function isoNow() {
@@ -301,59 +304,31 @@ async function seed(db: SQLiteDatabase) {
 
 export async function initializeDatabase(db: SQLiteDatabase) {
   await db.execAsync("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
-  const version = await db.getFirstAsync<{ user_version: number }>(
-    "PRAGMA user_version",
-  );
-  if ((version?.user_version ?? 0) < 1) {
+  const version = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
+  let currentVersion = version?.user_version ?? 0;
+  if (currentVersion < 1) {
     await db.execAsync(schemaSql);
-    await db.runAsync(
-      "INSERT OR IGNORE INTO schema_migrations(version,checksum,applied_at) VALUES(1,?,?)",
-      "mobile-schema-v1",
-      isoNow(),
-    );
+    await db.runAsync("INSERT OR IGNORE INTO schema_migrations(version,checksum,applied_at) VALUES(1,?,?)", "mobile-schema-v1", isoNow());
     await db.execAsync("PRAGMA user_version = 1");
+    currentVersion = 1;
   }
-  if ((version?.user_version ?? 0) < 2) {
-    await db.execAsync(`CREATE TABLE IF NOT EXISTS receivables (
-  id TEXT PRIMARY KEY,
-  person TEXT NOT NULL,
-  principal_minor INTEGER NOT NULL CHECK(principal_minor>0),
-  outstanding_minor INTEGER NOT NULL CHECK(outstanding_minor>=0 AND outstanding_minor<=principal_minor),
-  source_account_id TEXT NOT NULL REFERENCES accounts(id),
-  default_return_account_id TEXT REFERENCES accounts(id),
-  lent_date TEXT NOT NULL,
-  due_date TEXT,
-  status TEXT NOT NULL CHECK(status IN('OPEN','SETTLED')),
-  note TEXT NOT NULL DEFAULT '',
-  outbound_transaction_id TEXT UNIQUE NOT NULL REFERENCES transactions(id),
-  revision INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  CHECK(due_date IS NULL OR due_date>=lent_date)
-) STRICT;
-
-CREATE TABLE IF NOT EXISTS receivable_repayments (
-  id TEXT PRIMARY KEY,
-  receivable_id TEXT NOT NULL REFERENCES receivables(id),
-  amount_minor INTEGER NOT NULL CHECK(amount_minor>0),
-  destination_account_id TEXT NOT NULL REFERENCES accounts(id),
-  date TEXT NOT NULL,
-  transaction_id TEXT UNIQUE NOT NULL REFERENCES transactions(id),
-  note TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL
-) STRICT;
-CREATE INDEX IF NOT EXISTS receivable_status_due ON receivables(status,due_date);
-CREATE INDEX IF NOT EXISTS receivable_person ON receivables(person);
-CREATE INDEX IF NOT EXISTS repayment_receivable_date ON receivable_repayments(receivable_id,date);
-
-`);
+  if (currentVersion < 2) {
+    await db.execAsync(schemaSql);
     await db.runAsync("INSERT OR IGNORE INTO schema_migrations(version,checksum,applied_at) VALUES(2,?,?)", "mobile-receivables-v2", isoNow());
-    await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+    await db.execAsync("PRAGMA user_version = 2");
+    currentVersion = 2;
+  }
+  if (currentVersion < 3) {
+    const columns = await db.getAllAsync<{name:string}>("PRAGMA table_info(receivables)");
+    if (!columns.some((column) => column.name === "deleted"))
+      await db.execAsync("ALTER TABLE receivables ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1));");
+    await db.execAsync("CREATE INDEX IF NOT EXISTS receivable_active_due ON receivables(deleted,status,due_date);");
+    await db.runAsync("INSERT OR IGNORE INTO schema_migrations(version,checksum,applied_at) VALUES(3,?,?)", "mobile-receivables-soft-delete-v3", isoNow());
+    await db.execAsync("PRAGMA user_version = 3");
   }
   await seed(db);
   await ensureCycleForDate(db, today());
 }
-
 export async function getSettings(db: SQLiteDatabase): Promise<Settings> {
   const row = await db.getFirstAsync<{ data: string }>(
     "SELECT data FROM settings WHERE id=1",
@@ -663,7 +638,7 @@ export async function toggleAccountHidden(
 
 
 export type TransactionQuery = {
-  kind?: TransactionItem["kind"];
+  kind?: TransactionItem["kind"] | "RECEIVABLE";
   search?: string;
   start?: string;
   end?: string;
@@ -672,53 +647,45 @@ export type TransactionQuery = {
   sort?: "DATE_DESC" | "DATE_ASC" | "AMOUNT_DESC" | "AMOUNT_ASC" | "CATEGORY";
 };
 
-export async function loadTransactions(
-  db: SQLiteDatabase,
-  query: TransactionQuery = {},
-): Promise<TransactionItem[]> {
+export async function loadTransactions(db: SQLiteDatabase, query: TransactionQuery = {}): Promise<TransactionItem[]> {
   const clauses = ["x.deleted=0"];
   const params: (string | number)[] = [];
-  if (query.kind) { clauses.push("x.kind=?"); params.push(query.kind); }
+  if (query.kind === "RECEIVABLE") clauses.push("(ro.id IS NOT NULL OR rr.id IS NOT NULL)");
+  else if (query.kind) { clauses.push("x.kind=?"); params.push(query.kind); }
   if (query.start) { validDate(query.start); clauses.push("x.date>=?"); params.push(query.start); }
   if (query.end) { validDate(query.end); clauses.push("x.date<?"); params.push(query.end); }
   if (query.minAmountMinor !== undefined) { clauses.push("ABS(x.amount_minor)>=?"); params.push(query.minAmountMinor); }
   if (query.maxAmountMinor !== undefined) { clauses.push("ABS(x.amount_minor)<=?"); params.push(query.maxAmountMinor); }
   if (query.search?.trim()) {
     const term = "%" + query.search.trim().slice(0, 100) + "%";
-    clauses.push("(x.note LIKE ? OR cv.name LIKE ? OR s.name LIKE ? OR d.name LIKE ? OR x.date LIKE ?)");
-    params.push(term, term, term, term, term);
+    clauses.push("(x.note LIKE ? OR cv.name LIKE ? OR s.name LIKE ? OR d.name LIKE ? OR x.date LIKE ? OR ro.person LIKE ? OR rr.person LIKE ?)");
+    params.push(term, term, term, term, term, term, term);
   }
   const order = {
-    DATE_DESC: "x.date DESC,x.created_at DESC,x.id",
-    DATE_ASC: "x.date ASC,x.created_at ASC,x.id",
-    AMOUNT_DESC: "ABS(x.amount_minor) DESC,x.date DESC,x.id",
-    AMOUNT_ASC: "ABS(x.amount_minor) ASC,x.date DESC,x.id",
-    CATEGORY: "COALESCE(cv.name,'账户资金变动'),x.date DESC,x.id",
+    DATE_DESC: "x.date DESC,x.created_at DESC,x.id", DATE_ASC: "x.date ASC,x.created_at ASC,x.id",
+    AMOUNT_DESC: "ABS(x.amount_minor) DESC,x.date DESC,x.id", AMOUNT_ASC: "ABS(x.amount_minor) ASC,x.date DESC,x.id",
+    CATEGORY: "COALESCE(cv.name,ro.person,rr.person,'账户资金变动'),x.date DESC,x.id",
   }[query.sort ?? "DATE_DESC"];
-  const rows = await db.getAllAsync<{
-    id: string; kind: TransactionItem["kind"]; amount_minor: number; date: string;
-    note: string; salary: number; source_name: string | null; destination_name: string | null;
-    category_name: string | null; source_id: string | null; destination_id: string | null;
-    category_id: string | null; original_id: string | null;
-  }>(
-    `SELECT x.id,x.kind,x.amount_minor,x.date,x.note,x.salary,x.source_id,x.destination_id,cv.category_id,x.original_id,
-      s.name source_name,d.name destination_name,cv.name category_name
-     FROM transactions x
-     LEFT JOIN accounts s ON s.id=x.source_id
-     LEFT JOIN accounts d ON d.id=x.destination_id
-     LEFT JOIN category_versions cv ON cv.id=x.category_version_id
-     WHERE ${clauses.join(" AND ")} ORDER BY ${order} LIMIT 5000`,
-    ...params,
-  );
+  const rows = await db.getAllAsync<any>(`
+    SELECT x.id,x.kind,x.amount_minor,x.date,x.note,x.salary,x.source_id,x.destination_id,cv.category_id,x.original_id,
+      s.name source_name,d.name destination_name,cv.name category_name,
+      COALESCE(ro.id,rr.id) receivable_id,COALESCE(ro.person,rr.person) receivable_person,
+      CASE WHEN ro.id IS NOT NULL THEN 'LENT' WHEN rr.id IS NOT NULL THEN 'REPAID' END receivable_direction
+    FROM transactions x
+    LEFT JOIN receivables ro ON ro.outbound_transaction_id=x.id
+    LEFT JOIN receivable_repayments rp ON rp.transaction_id=x.id
+    LEFT JOIN receivables rr ON rr.id=rp.receivable_id
+    LEFT JOIN accounts s ON s.id=x.source_id
+    LEFT JOIN accounts d ON d.id=x.destination_id
+    LEFT JOIN category_versions cv ON cv.id=x.category_version_id
+    WHERE ${clauses.join(" AND ")} ORDER BY ${order} LIMIT 5000`, ...params);
   return rows.map((item) => ({
-    id: item.id, kind: item.kind, amountMinor: item.amount_minor, date: item.date,
-    note: item.note, salary: item.salary === 1, sourceName: item.source_name,
-    destinationName: item.destination_name, categoryName: item.category_name,
-    sourceId: item.source_id, destinationId: item.destination_id,
-    categoryId: item.category_id, originalId: item.original_id,
+    id:item.id, kind:item.kind, amountMinor:item.amount_minor, date:item.date, note:item.note, salary:item.salary===1,
+    sourceName:item.source_name, destinationName:item.destination_name, categoryName:item.category_name,
+    sourceId:item.source_id, destinationId:item.destination_id, categoryId:item.category_id, originalId:item.original_id,
+    receivableId:item.receivable_id, receivablePerson:item.receivable_person, receivableDirection:item.receivable_direction,
   }));
 }
-
 export async function loadSnapshot(db: SQLiteDatabase): Promise<Snapshot> {
   const settings = await getSettings(db);
   const cycle = await ensureCycleForDate(db, today());
@@ -767,10 +734,18 @@ export async function loadSnapshot(db: SQLiteDatabase): Promise<Snapshot> {
     destination_id: string | null;
     category_id: string | null;
     original_id: string | null;
+    receivable_id: string | null;
+    receivable_person: string | null;
+    receivable_direction: "LENT" | "REPAID" | null;
   }>(`
     SELECT x.id,x.kind,x.amount_minor,x.date,x.note,x.salary,x.source_id,x.destination_id,cv.category_id,x.original_id,
-      s.name source_name,d.name destination_name,cv.name category_name
+      s.name source_name,d.name destination_name,cv.name category_name,
+      COALESCE(ro.id,rr.id) receivable_id,COALESCE(ro.person,rr.person) receivable_person,
+      CASE WHEN ro.id IS NOT NULL THEN 'LENT' WHEN rr.id IS NOT NULL THEN 'REPAID' END receivable_direction
     FROM transactions x
+    LEFT JOIN receivables ro ON ro.outbound_transaction_id=x.id
+    LEFT JOIN receivable_repayments rp ON rp.transaction_id=x.id
+    LEFT JOIN receivables rr ON rr.id=rp.receivable_id
     LEFT JOIN accounts s ON s.id=x.source_id
     LEFT JOIN accounts d ON d.id=x.destination_id
     LEFT JOIN category_versions cv ON cv.id=x.category_version_id
@@ -867,7 +842,7 @@ export async function loadSnapshot(db: SQLiteDatabase): Promise<Snapshot> {
     today(), addDays(today(), -2), tomorrow,
   );
   const receivableSummary = await db.getFirstAsync<{ outstanding: number; overdue: number; due_today: number }>(
-    "SELECT COALESCE(SUM(outstanding_minor),0) outstanding,COALESCE(SUM(CASE WHEN due_date IS NOT NULL AND due_date<? THEN 1 ELSE 0 END),0) overdue,COALESCE(SUM(CASE WHEN due_date=? THEN 1 ELSE 0 END),0) due_today FROM receivables WHERE status='OPEN'",
+    "SELECT COALESCE(SUM(outstanding_minor),0) outstanding,COALESCE(SUM(CASE WHEN due_date IS NOT NULL AND due_date<? THEN 1 ELSE 0 END),0) overdue,COALESCE(SUM(CASE WHEN due_date=? THEN 1 ELSE 0 END),0) due_today FROM receivables WHERE deleted=0 AND status='OPEN'",
     today(), today(),
   );
   const totalAssetsMinor = mappedAccounts.reduce(
@@ -896,6 +871,9 @@ export async function loadSnapshot(db: SQLiteDatabase): Promise<Snapshot> {
       destinationId: transaction.destination_id,
       categoryId: transaction.category_id,
       originalId: transaction.original_id,
+      receivableId: transaction.receivable_id,
+      receivablePerson: transaction.receivable_person,
+      receivableDirection: transaction.receivable_direction,
     })),
     budgets,
     cycle,
@@ -1254,7 +1232,7 @@ export async function loadReceivables(db: SQLiteDatabase): Promise<ReceivableIte
     id:string;person:string;principal_minor:number;outstanding_minor:number;source_account_id:string;
     source_account_name:string;default_return_account_id:string|null;lent_date:string;due_date:string|null;
     status:"OPEN"|"SETTLED";note:string;revision:number;
-  }>("SELECT r.id,r.person,r.principal_minor,r.outstanding_minor,r.source_account_id,a.name source_account_name,r.default_return_account_id,r.lent_date,r.due_date,r.status,r.note,r.revision FROM receivables r JOIN accounts a ON a.id=r.source_account_id ORDER BY CASE r.status WHEN 'OPEN' THEN 0 ELSE 1 END,COALESCE(r.due_date,'9999-12-31'),r.created_at DESC");
+  }>("SELECT r.id,r.person,r.principal_minor,r.outstanding_minor,r.source_account_id,a.name source_account_name,r.default_return_account_id,r.lent_date,r.due_date,r.status,r.note,r.revision FROM receivables r JOIN accounts a ON a.id=r.source_account_id WHERE r.deleted=0 ORDER BY CASE r.status WHEN 'OPEN' THEN 0 ELSE 1 END,COALESCE(r.due_date,'9999-12-31'),r.created_at DESC");
   return Promise.all(rows.map(async (row) => ({
     id:row.id, person:row.person, principalMinor:row.principal_minor, outstandingMinor:row.outstanding_minor,
     sourceAccountId:row.source_account_id, sourceAccountName:row.source_account_name,
@@ -1288,7 +1266,7 @@ export async function createReceivable(db: SQLiteDatabase, input: {
 export async function repayReceivable(db: SQLiteDatabase,input:{
   id:string; revision:number; amountMinor:number; destinationAccountId:string; date:string; note?:string;
 }) {
-  const row=await db.getFirstAsync<{person:string;outstanding_minor:number;lent_date:string;status:string;revision:number}>("SELECT person,outstanding_minor,lent_date,status,revision FROM receivables WHERE id=?",input.id);
+  const row=await db.getFirstAsync<{person:string;outstanding_minor:number;lent_date:string;status:string;revision:number}>("SELECT person,outstanding_minor,lent_date,status,revision FROM receivables WHERE id=? AND deleted=0",input.id);
   if(!row||row.status!=="OPEN") throw new Error("待收款已结清或不存在");
   if(row.revision!==input.revision) throw new Error("记录已更新，请刷新");
   if(!Number.isSafeInteger(input.amountMinor)||input.amountMinor<=0||input.amountMinor>row.outstanding_minor) throw new Error("归还金额无效或超过待收金额");
@@ -1303,6 +1281,20 @@ export async function repayReceivable(db: SQLiteDatabase,input:{
   return repaymentId;
 }
 
+export async function deleteReceivable(db: SQLiteDatabase,input:{id:string;revision:number;reason?:string}) {
+  const row=await db.getFirstAsync<{outbound_transaction_id:string;revision:number}>("SELECT outbound_transaction_id,revision FROM receivables WHERE id=? AND deleted=0",input.id);
+  if(!row) throw new Error("待收款不存在或已撤销");
+  if(row.revision!==input.revision) throw new Error("记录已更新，请刷新");
+  const repayments=await db.getAllAsync<{transaction_id:string}>("SELECT transaction_id FROM receivable_repayments WHERE receivable_id=?",input.id);
+  const transactionIds=[row.outbound_transaction_id,...repayments.map(x=>x.transaction_id)];
+  const now=isoNow(),operationId=id("op");
+  await db.withExclusiveTransactionAsync(async tx=>{
+    await tx.runAsync("INSERT INTO operations(id,hash,action,result,created_at) VALUES(?,?,?,?,?)",operationId,input.id,"DELETE_RECEIVABLE",JSON.stringify({transactions:transactionIds.length}),now);
+    for(const transactionId of transactionIds) await tx.runAsync("UPDATE transactions SET deleted=1,revision=revision+1,updated_at=? WHERE id=? AND deleted=0",now,transactionId);
+    await tx.runAsync("UPDATE receivables SET deleted=1,revision=revision+1,updated_at=? WHERE id=?",now,input.id);
+    await tx.runAsync("INSERT INTO audit(id,operation_id,entity,entity_id,before_data,after_data,reason,created_at) VALUES(?,?,?,?,?,?,?,?)",id("audit"),operationId,"receivable",input.id,JSON.stringify(row),JSON.stringify({...row,deleted:1}),input.reason?.trim()||"撤销待收款",now);
+  });
+}
 export type BillOccurrenceItem = {
   id: string;
   billId: string;

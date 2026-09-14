@@ -12,6 +12,8 @@ test('Android SQLite 初始 schema 可以一次建成并启用核心约束', () 
     assert.ok(tables.includes(required), `missing ${required}`);
   }
   assert.equal((db.prepare('PRAGMA foreign_keys').get() as { foreign_keys: number }).foreign_keys, 1);
+  const receivableColumns = db.prepare('PRAGMA table_info(receivables)').all().map((row) => (row as {name:string}).name);
+  assert.ok(receivableColumns.includes('deleted'));
   assert.throws(() => db.exec("INSERT INTO accounts(id,name,type_id,start_date,roles,created_at) VALUES('x','x','missing','2026-09-12','[]','now')"), /FOREIGN KEY/);
   db.close();
 });

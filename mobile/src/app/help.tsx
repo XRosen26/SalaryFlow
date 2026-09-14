@@ -155,11 +155,10 @@ export default function HelpScreen() {
             薪流 SalaryFlow
           </Text>
           <Text style={[styles.version, { color: colors.primary }]}>
-            移动端 0.5.0
+            移动端 0.5.1
           </Text>
           <Text style={[styles.aboutBody, { color: colors.textSecondary }]}>
-            薪流是一款本地优先的个人预算、现金流与资产管理应用，由 XRosen26 使用
-            Codex 完成并持续迭代。
+            薪流是一款本地优先的个人预算、现金流与资产管理应用，由 XRosen26 完成并持续迭代。
           </Text>
           <Text style={[styles.aboutBody, { color: colors.textSecondary }]}>
             当前提供 Windows 与 Android 预览版，iOS 共用工程已搭建。各平台按屏幕与输入方式优化，并沿用一致的财务计算与数据规则。

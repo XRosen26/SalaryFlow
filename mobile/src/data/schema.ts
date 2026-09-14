@@ -1,4 +1,4 @@
-export const DATABASE_VERSION = 2;
+export const DATABASE_VERSION = 3;
 
 export const schemaSql = `
 PRAGMA journal_mode = WAL;
@@ -219,6 +219,7 @@ CREATE TABLE IF NOT EXISTS receivables (
   revision INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1)),
   CHECK(due_date IS NULL OR due_date>=lent_date)
 ) STRICT;
 

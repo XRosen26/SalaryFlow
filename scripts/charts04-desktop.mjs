@@ -14,10 +14,10 @@ s.command("initialize", {
   accounts: [
     {
       name: "日常账户",
-      opening_minor: "500000000",
+      opening_minor: "1600000",
       roles: ["SPENDING", "SALARY"],
     },
-    { name: "储蓄账户", opening_minor: "200000000", roles: ["SAVINGS"] },
+    { name: "储蓄账户", opening_minor: "2800000", roles: ["SAVINGS"] },
   ],
 });
 const d = s.snapshot(),
@@ -26,21 +26,21 @@ const d = s.snapshot(),
   inc = d.categories.find((c) => c.kind === "INCOME");
 s.command("record", {
   kind: "INCOME",
-  amount_minor: "190029656",
+  amount_minor: "1285000",
   date: first,
   destination_id: a.id,
   category_id: inc.id,
 });
 s.command("record", {
   kind: "EXPENSE",
-  amount_minor: "43164206",
+  amount_minor: "920000",
   date: first,
   source_id: a.id,
   category_id: cat.id,
 });
 s.command("record", {
   kind: "EXPENSE",
-  amount_minor: "1500000",
+  amount_minor: "75000",
   date: today,
   source_id: a.id,
   category_id: "__custom",
@@ -54,7 +54,7 @@ s.command("saveBudget", {
     {
       category_id: cat.id,
       category_version_id: cat.version_id,
-      amount_minor: "45274578",
+      amount_minor: "987000",
       enabled: true,
     },
   ],
@@ -108,12 +108,16 @@ try {
   await page.getByLabel("趋势图形式").selectOption("bar");
   await page.getByLabel("趋势指标").selectOption("both");
   await page.getByText("查看精确日期数据", { exact: true }).click();
-  if (!env.SALARYFLOW_SKIP_SCREENSHOTS)
+  if (!env.SALARYFLOW_SKIP_SCREENSHOTS) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const mainBox = await page.locator("main").boundingBox();
+    assert(mainBox);
     await page.screenshot({
       path: "test-results/14-analysis04.png",
-      fullPage: true,
+      clip: { x: mainBox.x, y: 0, width: mainBox.width, height: Math.min(1200, mainBox.height) },
       timeout: 30000,
     });
+  }
   await page
     .locator("nav")
     .getByRole("button", { name: "设置与数据", exact: true })

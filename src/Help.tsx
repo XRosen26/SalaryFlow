@@ -70,14 +70,14 @@ const topics = [
   [
     "关于作者",
     "About the creator",
-    "XRosen26 使用 Codex 完成了这个产品。",
-    "XRosen26 created this product with Codex.",
+    "由 XRosen26 完成并持续迭代。",
+    "Created and continuously improved by XRosen26.",
   ],
   [
     "关于本程序",
     "About this application",
-    "薪流 SalaryFlow 0.8.0 是持续迭代的本地优先个人预算、现金流与资产管理产品，当前提供 Windows 桌面端和 Android 预览版，iOS 共用工程已搭建。各平台按屏幕与输入方式设计，并共享整数金额、交易、预算和统计口径。",
-    "SalaryFlow 0.8.0 is an evolving, local-first personal budgeting, cash-flow, and asset management product. Windows and Android are available today, while the shared iOS project is ready for macOS/Xcode packaging. All platforms use the same integer-money, transaction, budget, and analytics rules.",
+    "薪流 SalaryFlow 0.8.1 是持续迭代的本地优先个人预算、现金流与资产管理产品，当前提供 Windows 桌面端和 Android 预览版，iOS 共用工程已搭建。各平台按屏幕与输入方式设计，并共享整数金额、交易、预算和统计口径。",
+    "SalaryFlow 0.8.1 is an evolving, local-first personal budgeting, cash-flow, and asset management product. Windows and Android are available today, while the shared iOS project is ready for macOS/Xcode packaging. All platforms use the same integer-money, transaction, budget, and analytics rules.",
   ],
 ];
 export function Help() {
@@ -109,8 +109,8 @@ export function Help() {
           </summary>
           <p>
             {en
-              ? "Illustrative test data, not your ledger. The chart, categories and comparison share the selected date range."
-              : "以下为隔离测试账本截图，不是你的真实账目。趋势、分类和前期比较共用所选日期范围。"}
+              ? "A real capture of the isolated test ledger main content, without a duplicated sidebar. It is not your ledger. The chart, categories, and comparison share the selected date range."
+              : "以下为隔离测试账本的真实主内容区截图，不含重复侧栏，也不是你的真实账目。趋势、分类和前期比较共用所选日期范围。"}
           </p>
           <img
             src={new URL("./assets/manual-analysis.png", import.meta.url).href}

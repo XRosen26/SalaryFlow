@@ -20,6 +20,10 @@ CREATE TABLE receivable_repayments (id TEXT PRIMARY KEY, receivable_id TEXT NOT 
 CREATE INDEX receivable_status_due ON receivables(status,due_date);
 CREATE INDEX receivable_person ON receivables(person);
 CREATE INDEX repayment_receivable_date ON receivable_repayments(receivable_id,date);
+`},
+  {version:6,name:'待收款软删除',sql:`
+ALTER TABLE receivables ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1));
+CREATE INDEX receivable_active_due ON receivables(deleted,status,due_date);
 `}
 ];
-export const currentSchema = 5;
+export const currentSchema = 6;

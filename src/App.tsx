@@ -119,6 +119,16 @@ const ranges = [
   ["months12", msg("最近12个月")],
   ["custom", msg("自定义")],
 ];
+function receivableDueState(dueDate: string | null, status: string, today: string) {
+  if (status === "SETTLED") return { key: "settled", label: msg("已结清") };
+  if (!dueDate) return { key: "none", label: msg("未设归还日") };
+  if (dueDate < today) return { key: "overdue", label: msg("已逾期") };
+  if (dueDate === today) return { key: "today", label: msg("今日到期") };
+  if (dueDate === addDays(today, 1)) return { key: "day1", label: msg("明日到期") };
+  if (dueDate === addDays(today, 2)) return { key: "day2", label: msg("2天后到期") };
+  if (dueDate === addDays(today, 3)) return { key: "day3", label: msg("3天后到期") };
+  return { key: "later", label: msg("待归还") };
+}
 type Field = {
   name: string;
   label: string;
@@ -1235,8 +1245,8 @@ export default function App() {
   }
   function details(t: Data) {
     setModal({
-      title: kinds[t.kind] + msg("详情"),
-      subtitle: t.date + " · " + (t.category_name || msg("账户资金变动")),
+      title: (t.receivable_id ? msg(t.receivable_direction === "LENT" ? "待收借出" : "待收归还") : kinds[t.kind]) + msg("详情"),
+      subtitle: t.date + " · " + (t.receivable_person || t.category_name || msg("账户资金变动")),
       body: (
         <>
           <div className="detail-amount">¥ {fmt(t.amount_minor)}</div>
@@ -1403,11 +1413,13 @@ export default function App() {
                     </span>
                     <div>
                       <strong>
-                        {t.kind === "TRANSFER"
-                          ? msg("账户转账")
-                          : t.category_name || kinds[t.kind]}
+                        {t.receivable_id
+                          ? `${msg(t.receivable_direction === "LENT" ? "待收借出" : "待收归还")} · ${t.receivable_person}`
+                          : t.kind === "TRANSFER"
+                            ? msg("账户转账")
+                            : t.category_name || kinds[t.kind]}
                       </strong>
-                      <small>{t.note || kinds[t.kind]}</small>
+                      <small>{t.receivable_id ? msg("不计收入、支出与预算") : (t.note || kinds[t.kind])}</small>
                     </div>
                   </div>
                 </td>
@@ -2659,15 +2671,23 @@ export default function App() {
                 {data.receivables?.length ? <div className="table-wrap"><table>
                   <thead><tr><th>{msg("对方")}</th><th>{msg("借出账户")}</th><th>{msg("借出 / 预计归还")}</th><th className="align-right">{msg("本金")}</th><th className="align-right">{msg("仍待收")}</th><th>{msg("状态")}</th><th /></tr></thead>
                   <tbody>{data.receivables.map((row: Data) => {
-                    const overdue = row.status === "OPEN" && row.due_date && row.due_date < data.today;
-                    return <tr key={row.id}>
+                    const due = receivableDueState(row.due_date, row.status, data.today);
+                    return <tr key={row.id} className={`receivable-due ${due.key}`}>
                       <td><strong>{row.person}</strong><small>{row.note || msg("无备注")}</small></td>
                       <td>{row.source_account_name}</td>
-                      <td className="mono">{row.lent_date}<br /><span className={overdue ? "danger-text" : "muted"}>{row.due_date || msg("未设归还日")}</span></td>
+                      <td className="mono">{row.lent_date}<br /><span>{row.due_date || msg("未设归还日")}</span></td>
                       <td className="align-right money">¥ {fmt(row.principal_minor)}</td>
                       <td className="align-right money">¥ {fmt(row.outstanding_minor)}</td>
-                      <td><span className={"tag " + (overdue ? "warn" : "neutral")}>{row.status === "SETTLED" ? msg("已结清") : overdue ? msg("已逾期") : msg("待归还")}</span></td>
-                      <td>{row.status === "OPEN" && <button onClick={() => repayReceivable(row)}>{msg("登记归还")}</button>}</td>
+                      <td><span className={`tag receivable-status ${due.key}`}>{due.label}</span></td>
+                      <td><div className="receivable-row-actions">
+                        {row.status === "OPEN" && <button onClick={() => repayReceivable(row)}>{msg("登记归还")}</button>}
+                        <button className="danger icon-button" title={msg("撤销待收款")} aria-label={msg("撤销待收款")} onClick={() =>
+                          confirm(msg("撤销待收款"), msg("仅在未实际借出或误操作时使用。借出和全部归还流水将一并撤销，相关账户余额会恢复。"), async (p, op) =>
+                            mutate("deleteReceivable", { id: row.id, revision: row.revision, reason: p.reason || msg("用户确认未实际借出或误操作") }, op),
+                            [{ name: "reason", label: msg("撤销原因"), required: false }])}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div></td>
                     </tr>;
                   })}</tbody>
                 </table></div> : <Empty title={msg("暂无待收款")} hint={msg("朋友或亲人借款时，可记录对方、账户和可选归还日期。")} action={<button className="primary" onClick={receivableForm}>{msg("新增第一笔")}</button>} />}
@@ -3632,7 +3652,7 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.8.0 · Windows 与移动端本地个人预算、现金流和资产管理",
+                          "SalaryFlow 0.8.1 · Windows 与移动端本地个人预算、现金流和资产管理",
                         )}
                       </p>
                       <p>
@@ -3641,7 +3661,7 @@ export default function App() {
                         )}
                       </p>
                     </div>
-                    <p>{msg("由 XRosen26 使用 Codex 完成。")}</p>
+                    <p>{msg("由 XRosen26 完成并持续迭代。")}</p>
                     <ShieldCheck size={32} className="positive" />
                   </div>
                 </section>

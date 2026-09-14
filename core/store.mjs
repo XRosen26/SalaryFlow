@@ -224,6 +224,7 @@ export class Store {
       "snoozeBill",
       "createReceivable",
       "repayReceivable",
+      "deleteReceivable",
     ];
     ensure(allowed.includes(action), "操作不可用");
     const digest = hash(json({ action, payload }));
@@ -1893,7 +1894,14 @@ export class Store {
         ` ORDER BY ${transactionOrder} LIMIT 100 OFFSET ?`,
       ...filter,
       page * 100,
-    ).map((t) => ({ ...t, amount_minor: String(t.amount_minor) }));
+    ).map((t) => {
+      const receivable = this.one(
+        "SELECT r.id receivable_id,r.person receivable_person,'LENT' receivable_direction FROM receivables r WHERE r.outbound_transaction_id=? UNION ALL SELECT r.id,r.person,'REPAID' FROM receivable_repayments p JOIN receivables r ON r.id=p.receivable_id WHERE p.transaction_id=? LIMIT 1",
+        t.id,
+        t.id,
+      );
+      return { ...t, ...receivable, amount_minor: String(t.amount_minor) };
+    });
     if (p.analysis) {
       const length = Math.round(
         (new Date(end + "T00:00:00Z") - new Date(start + "T00:00:00Z")) /
@@ -1977,7 +1985,7 @@ export class Store {
         "SELECT * FROM cycle_rules ORDER BY effective_from DESC",
       ),
       receivables: this.all(
-        "SELECT r.*,s.name source_account_name,d.name return_account_name FROM receivables r JOIN accounts s ON s.id=r.source_account_id LEFT JOIN accounts d ON d.id=r.default_return_account_id ORDER BY CASE r.status WHEN 'OPEN' THEN 0 ELSE 1 END,COALESCE(r.due_date,'9999-12-31'),r.created_at DESC",
+        "SELECT r.*,s.name source_account_name,d.name return_account_name FROM receivables r JOIN accounts s ON s.id=r.source_account_id LEFT JOIN accounts d ON d.id=r.default_return_account_id WHERE r.deleted=0 ORDER BY CASE r.status WHEN 'OPEN' THEN 0 ELSE 1 END,COALESCE(r.due_date,'9999-12-31'),r.created_at DESC",
       ).map((r) => ({
         ...r,
         principal_minor: String(r.principal_minor),
@@ -1985,7 +1993,7 @@ export class Store {
         repayments: this.all("SELECT p.*,a.name destination_account_name FROM receivable_repayments p JOIN accounts a ON a.id=p.destination_account_id WHERE p.receivable_id=? ORDER BY p.date DESC,p.created_at DESC", r.id).map((p) => ({ ...p, amount_minor: String(p.amount_minor) })),
       })),
       receivableSummary: (() => {
-        const rows = this.all("SELECT outstanding_minor,due_date FROM receivables WHERE status='OPEN'");
+        const rows = this.all("SELECT outstanding_minor,due_date FROM receivables WHERE deleted=0 AND status='OPEN'");
         return {
           outstanding: String(rows.reduce((sum, row) => sum + BigInt(row.outstanding_minor), 0n)),
           open: rows.length,
@@ -2049,7 +2057,7 @@ export class Store {
     return { id: receivableId };
   }
   repayReceivable(p) {
-    const row = this.one("SELECT * FROM receivables WHERE id=?", p.id);
+    const row = this.one("SELECT * FROM receivables WHERE id=? AND deleted=0", p.id);
     ensure(row && row.status === "OPEN", "待收款已结清或不存在");
     ensure(row.revision === p.revision, "待收款已更新，请刷新");
     const amount = minor(p.amount_minor);
@@ -2071,6 +2079,18 @@ export class Store {
     this.run("UPDATE receivables SET outstanding_minor=?,status=?,revision=revision+1,updated_at=? WHERE id=?", outstanding, outstanding === 0n ? "SETTLED" : "OPEN", timestamp, row.id);
     this.audit("receivable", row.id, row, this.one("SELECT * FROM receivables WHERE id=?", row.id), "登记归还");
     return { id: repaymentId, settled: outstanding === 0n };
+  }
+  deleteReceivable(p) {
+    const row = this.one("SELECT * FROM receivables WHERE id=? AND deleted=0", p.id);
+    ensure(row, "待收款不存在或已撤销");
+    ensure(row.revision === p.revision, "待收款已更新，请刷新");
+    const timestamp = now();
+    const transactionIds = [row.outbound_transaction_id, ...this.all("SELECT transaction_id FROM receivable_repayments WHERE receivable_id=?", row.id).map((x) => x.transaction_id)];
+    for (const transactionId of transactionIds)
+      this.run("UPDATE transactions SET deleted=1,revision=revision+1,updated_at=? WHERE id=? AND deleted=0", timestamp, transactionId);
+    this.run("UPDATE receivables SET deleted=1,revision=revision+1,updated_at=? WHERE id=?", timestamp, row.id);
+    this.audit("receivable", row.id, row, this.one("SELECT * FROM receivables WHERE id=?", row.id), safeNote(p.reason || "撤销待收款"));
+    return { id: row.id, transactions: transactionIds.length };
   }
   saveBill(p) {
     const old = p.id ? this.one("SELECT * FROM bills WHERE id=?", p.id) : null;

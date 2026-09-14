@@ -1,4 +1,14 @@
-# 验证记录 · Windows 0.8.0 / Android 0.5.0
+# 验证记录 · Windows 0.8.1 / Android 0.5.1
+
+## Windows 0.8.1 / Android 0.5.1 验收 · 2026-09-14
+
+Windows：60项Node财务、迁移与可靠性测试全部通过，TypeScript/Vite生产构建通过；源码Electron和0.8.1最终解包程序均通过完整桌面流程。新增覆盖待收款整组撤销、关联流水展示、日期临近分级，以及schema 6迁移。高分屏辅助文字、状态标签、表头和面板说明统一提高到可读字号，主要数据层级保持不变。最终ASAR共4059个条目；关键词命中仅为Lucide的备份图标代码，未包含SQLite账本、备份或用户数据。
+
+Android：Expo SDK 57配置、TypeScript和8项领域测试通过；ARM64 Release执行576个Gradle任务并通过Lint Vital与资源优化。移动数据库升级至schema 3；待收款加入快速记账、交易筛选、关联流水展示、六档到期提示和确认撤销。APK共1235个条目，未发现SQLite账本、数据库、备份或用户目录文件。
+
+iOS：共用Expo工程以0.5.1、buildNumber 6重新导出HBC bundle成功，共1389个模块。Windows不能执行Xcode原生编译和签名，因此本次仍没有IPA；真机安装需在macOS/Xcode使用Personal Team、Ad Hoc或TestFlight完成。
+
+发布物SHA-256：Windows安装版 `93025bc16b475c9241ed1dbef0d15381a6b3383eef4a162d9b0ed59d7381f475`；Windows便携版 `122bfc8fbd0b5a973037b2feba1efc4951db69564f24ac1263bd804d43d8e120`；Android APK `efeee7bfb022f06faae842b7a84bb1d6cdf5394ec4683c2962c7188cb150fe46`。两个Windows文件未使用公开代码签名证书。本轮未连接真实Android/iOS设备，键盘避让、大字体、厂商系统差异和提醒到达时机仍需持续真机试用。
 
 ## Windows 0.8.0 / Android 0.5.0 验收 · 2026-09-14
 

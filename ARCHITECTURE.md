@@ -1,10 +1,10 @@
 # 薪流 SalaryFlow · 技术、数据库与验证设计
 
-## 0.8.0实现补充
+## 0.8.1实现补充
 
-数据库schema 5新增`receivables`与`receivable_repayments`。每次借出/归还与一条`ADJUSTMENT`资金记录一一关联，在同一SQLite事务内写入；报表只聚合INCOME/EXPENSE/REFUND，因此不会污染收支。金额仍为整数分，余额不足、超额归还、日期和revision均在提交前校验。
+数据库schema 5新增`receivables`与`receivable_repayments`。每次借出/归还与一条`ADJUSTMENT`资金记录一一关联，在同一SQLite事务内写入；schema 6为待收款增加软删除标记，撤销时原子软删除全部关联资金记录并保留审计；报表只聚合INCOME/EXPENSE/REFUND，因此不会污染收支。金额仍为整数分，余额不足、超额归还、日期和revision均在提交前校验。
 
-移动schema 2采用相同两表和资金口径。Android/iOS共用Expo SDK 57工程、SQLite仓储和页面代码；iOS使用固定Bundle ID `com.xrosen26.salaryflow`，当前Windows环境完成bundle导出，原生签名留给macOS/Xcode。
+移动schema 3采用相同两表、资金口径与待收款软删除机制。Android/iOS共用Expo SDK 57工程、SQLite仓储和页面代码；iOS使用固定Bundle ID `com.xrosen26.salaryflow`，当前Windows环境完成bundle导出，原生签名留给macOS/Xcode。
 
 
 0.5增量：settings JSON增加amount_visibility，包含master、overview三卡和动态account id映射，兼容旧hide_amounts；显示判定不参与金额计算。setPayday以IMMEDIATE/NEXT_WEEK显式模式更新开放周期和cycle_rules，事务内验证交易范围及结算快照。resetLedger在主进程原生二次确认后关闭SQLite，限定路径删除主库/WAL/SHM和可选的SalaryFlow命名备份，再创建空账本并重载；schema保持3。
@@ -341,7 +341,7 @@ CSV文本字段遇=、+、−、@或前导控制字符等潜在公式前缀时�
 | T15 | 两账户各花餐饮1000和500，预算1500                           | 分类实际1500、剩余0、执行率100%；不按账户重复预算             | 领域            |
 | T16 | B=100，E=79.99/80/100/100.01/110                            | 正常/接近/用完/超支/超支；显示四舍五入不改变状态              | 单元            |
 | T17 | B=0，E=0/10/−10；B=100,E=−20                                | 未设预算、无除零；负净额保留；剩余120且有退款说明             | 单元            |
-| T18 | 默认房租1850，本期改1852.25仅本期                           | 默认仍1850；本期1852.25，初始1850可查                         | 集成            |
+| T18 | 默认房租2400，本期改2550且选择仅本期                        | 默认仍2400；本期2550，初始版本可查                            | 集成            |
 | T19 | 同时更新本期和默认中途故障；正常完成后建下期                | 故障两个都回滚；正常下期复制新默认，旧周期不变                | 集成            |
 | T20 | 删/停用预算分类但已有支出50                                 | 额度按0，实际50仍进全周期支出；不从列表消失                   | 集成            |
 | T21 | 系统种子升级、重复首次初始化                                | 不覆盖个人/周期预算；不重复创建账户与模板                     | 集成            |

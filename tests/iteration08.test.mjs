@@ -72,3 +72,27 @@ test("今日与最近三天使用包含今天的半开区间", () => {
   assert.deepEqual(timeRange("today", "2026-09-14"), { start: "2026-09-14", end: "2026-09-15" });
   assert.deepEqual(timeRange("days3", "2026-09-14"), { start: "2026-09-12", end: "2026-09-15" });
 });
+
+test("撤销待收款会原子软删除借出和归还流水并恢复余额", (t) => {
+  const { store, account } = fixture(t);
+  store.command("createReceivable", {
+    person: "测试对象", amount_minor: "30000", source_account_id: account.id,
+    default_return_account_id: account.id, lent_date: "2026-09-12", due_date: "2026-09-16",
+  });
+  let row = store.snapshot().receivables[0];
+  store.command("repayReceivable", {
+    id: row.id, revision: row.revision, amount_minor: "10000",
+    destination_account_id: account.id, date: "2026-09-14",
+  });
+  row = store.snapshot().receivables[0];
+  assert.equal(store.snapshot().accounts[0].balance, "80000");
+  const result = store.command("deleteReceivable", {
+    id: row.id, revision: row.revision, reason: "误操作",
+  });
+  assert.equal(result.transactions, 2);
+  const snapshot = store.snapshot({ start: "2026-09-01", end: "2026-10-01" });
+  assert.equal(snapshot.receivables.length, 0);
+  assert.equal(snapshot.accounts[0].balance, "100000");
+  assert.equal(store.one("SELECT deleted FROM receivables WHERE id=?", row.id).deleted, 1);
+  assert.equal(store.one("SELECT COUNT(*) n FROM transactions WHERE note LIKE '%测试对象%' AND deleted=1").n, 2);
+});

@@ -125,12 +125,12 @@ export default function TransactionDetailScreen() {
     <AppScreen>
       <PageHeader
         title="交易详情"
-        subtitle="修改和删除都会保留审计记录。"
-        action={<Pill text={labels[item.kind] ?? item.kind} />}
+        subtitle={item.receivableId ? "待收款资金流水请在待收款页面管理。" : "修改和删除都会保留审计记录。"}
+        action={<Pill text={item.receivableId ? "待收款" : (labels[item.kind] ?? item.kind)} />}
       />
       <Card style={styles.card}>
         <Text style={[styles.muted, { color: colors.textSecondary }]}>
-          {item.categoryName ?? labels[item.kind]}
+          {item.receivableId ? `${item.receivableDirection === "LENT" ? "借给" : "收到归还"} ${item.receivablePerson}` : (item.categoryName ?? labels[item.kind])}
         </Text>
         <MoneyAmount
           value={item.amountMinor}
@@ -144,6 +144,11 @@ export default function TransactionDetailScreen() {
           <Fact label="备注" value={item.note || "无"} />
         </View>
       </Card>
+      {item.receivableId ? (
+        <Pressable style={[styles.primary, { backgroundColor: colors.primary }]} onPress={() => router.push("/receivables" as never)}>
+          <Ionicons name="cash-outline" size={20} color="#fff" /><Text style={styles.primaryText}>前往待收款管理</Text>
+        </Pressable>
+      ) : null}
       {["INCOME", "EXPENSE", "TRANSFER"].includes(item.kind) ? (
         <Pressable
           style={[styles.primary, { backgroundColor: colors.primary }]}
