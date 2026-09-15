@@ -4,25 +4,26 @@
 
 ## 下载
 
-当前发布：**Windows 0.8.1 / Android 0.5.1 预览版**。
+当前发布：**Windows 0.9.0 / Android 0.6.0 预览版**。
 
-- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.8.1/SalaryFlow-Setup-0.8.1-x64.exe)
-- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.8.1/SalaryFlow-Portable-0.8.1-x64.exe)
-- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.8.1/SalaryFlow-Android-0.5.1-preview-arm64-v8a.apk)
-- [SHA-256 校验清单](https://github.com/XRosen26/SalaryFlow/releases/download/v0.8.1/SHA256SUMS.txt)
+- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SalaryFlow-Setup-0.9.0-x64.exe)
+- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SalaryFlow-Portable-0.9.0-x64.exe)
+- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SalaryFlow-Android-0.6.0-preview-arm64-v8a.apk)
+- [SHA-256 校验清单](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SHA256SUMS.txt)
 
 Windows 安装包暂未使用公开代码签名证书，系统可能提示“未知发布者”。Android 包使用预览签名，支持 Android 7（API 24）及以上并按 API 36 构建，适合个人试用。iOS 共用源代码与配置已经建立；IPA 需要在 macOS/Xcode 环境完成原生构建与签名，本次不提供 iOS 安装包。
 
 ## 平台状态
 
-| 平台 | 版本 | 状态 |
-| --- | --- | --- |
-| Windows | 0.8.1 | 完整桌面端，适合预算规划、批量查看、统计、备份与长期维护 |
-| Android | 0.5.1 预览 | 触屏优先，突出快速记账、预算提醒、待收款和移动分析 |
-| iOS | 0.5.1 源码预览 | 共用 Expo/React Native 业务代码，配置与 iOS bundle 已验证，等待 macOS 真机构建 |
-| HarmonyOS | 规划中 | 待移动端基本体验稳定后再评估 |
+| 平台      | 版本           | 状态                                                                           |
+| --------- | -------------- | ------------------------------------------------------------------------------ |
+| Windows   | 0.9.0          | 完整桌面端，适合预算规划、批量查看、统计、备份与长期维护                       |
+| Android   | 0.6.0 预览     | 触屏优先，突出快速记账、预算提醒、待收款和移动分析                             |
+| iOS       | 0.6.0 源码预览 | 共用 Expo/React Native 业务代码，配置与 iOS bundle 已验证，等待 macOS 真机构建 |
+| HarmonyOS | 规划中         | 待移动端基本体验稳定后再评估                                                   |
 
 各平台当前分别保存本地账本，不做多设备实时同步。完整 JSON 备份用于移动端迁移或恢复，属于整库替换，不会合并多台设备同时产生的记录。
+
 ## iOS测试说明
 
 测试安装不必先上架App Store。可在Mac上的Xcode使用免费Apple账号的Personal Team把应用安装到本人设备；免费签名通常7天到期，之后需要重新构建安装。普通Windows电脑上的macOS虚拟机不作为支持方案：Apple许可只允许在Apple品牌电脑上虚拟化macOS，且USB真机连接与签名不稳定。需要多人或较长期测试时，建议使用付费Apple Developer Program配合TestFlight或Ad Hoc。
@@ -32,7 +33,7 @@ Windows 安装包暂未使用公开代码签名证书，系统可能提示“未
 - 收入、支出、转账、关联退款、固定账单、工资分配和待收款分次归还
 - 工资周期或自然月预算；周期规则可立即、下周期或指定日期生效
 - 动态账户、理财估值、余额校准，以及全局与卡片/账户双层金额隐藏
-- 统计支持今日、最近3/7/30/90天、自然周期、工资周期与自定义区间
+- 统计支持今日、最近3/7/30/90天、工资周期、自定义区间，以及从首次记账日期生成的周/月/年快捷历史周期
 - 周期预算、收入/支出、收支规模、账户资产与分类层级可视化；图表随六套配色和明暗主题协调变化
 - 交易可按类型、账户、分类、日期、金额范围和多种顺序筛选
 - 金额输入支持 `+ - * / ( )`，最终按整数“分”保存，避免浮点误差
@@ -47,7 +48,7 @@ Windows 安装包暂未使用公开代码签名证书，系统可能提示“未
 - 待收款的借出与归还属于资产形态变化：借出减少账户资金，归还增加所选账户资金，均不计收支、预算或储蓄率。
 - 统计按交易实际发生日动态聚合；同一交易只保存一次。
 - 预算值绑定选定预算周期，预算执行按该周期内交易实际发生日计算。
-- “当前可安心支出”取本期剩余预算与主要消费账户余额的较小非负值；预算用完或超支后切换为明确提醒。
+- “可支出金额”取本期剩余预算与主要消费账户余额的较小非负值；状态颜色取预算剩余比例和账户覆盖比例中更紧张的一项，资金不足、接近上限、用完或超支均有明确提醒。
 - 理财估值变化只影响资产，不伪装成收入或支出。
 - 工资分配记录用户已在银行完成的真实转账，应用本身不会执行银行转账。
 

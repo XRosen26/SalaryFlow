@@ -95,3 +95,101 @@ export function budgetPeriodRange(
     end: monthDay(date.getUTCFullYear(), date.getUTCMonth() + 1, 1),
   };
 }
+export type CalendarPeriodUnit = "week" | "month" | "year";
+export type CalendarPeriodOption = {
+  key: string;
+  start: string;
+  end: string;
+  label: string;
+};
+
+function naturalRange(unit: CalendarPeriodUnit, anchor: string) {
+  const value = validDate(anchor);
+  const date = new Date(`${value}T00:00:00Z`);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  if (unit === "week") {
+    const start = addDays(value, -((date.getUTCDay() + 6) % 7));
+    return { start, end: addDays(start, 7) };
+  }
+  if (unit === "month")
+    return {
+      start: monthDay(year, month, 1),
+      end: monthDay(year, month + 1, 1),
+    };
+  return { start: monthDay(year, 0, 1), end: monthDay(year + 1, 0, 1) };
+}
+
+function isoWeek(start: string) {
+  const thursday = addDays(start, 3);
+  const year = Number(thursday.slice(0, 4));
+  const jan4 = `${year}-01-04`;
+  const firstMonday = addDays(
+    jan4,
+    -((new Date(`${jan4}T00:00:00Z`).getUTCDay() + 6) % 7),
+  );
+  return {
+    year,
+    week:
+      Math.floor(
+        (new Date(`${start}T00:00:00Z`).getTime() -
+          new Date(`${firstMonday}T00:00:00Z`).getTime()) /
+          604800000,
+      ) + 1,
+  };
+}
+
+export function calendarPeriodOptions(
+  unit: CalendarPeriodUnit,
+  ledgerStart: string,
+  anchor = today(),
+): CalendarPeriodOption[] {
+  const current = naturalRange(unit, anchor);
+  const earliest = naturalRange(unit, ledgerStart);
+  const rows: CalendarPeriodOption[] = [];
+  let cursor = current.start;
+  for (let index = 0; cursor >= earliest.start && index < 20000; index += 1) {
+    if (unit === "week") {
+      const info = isoWeek(cursor);
+      rows.push({
+        key: cursor,
+        start: cursor,
+        end: addDays(cursor, 7),
+        label:
+          index === 0
+            ? "本周"
+            : index === 1
+              ? "上周"
+              : `${info.year}年第${info.week}周`,
+      });
+      cursor = addDays(cursor, -7);
+      continue;
+    }
+    const date = new Date(`${cursor}T00:00:00Z`);
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    if (unit === "month") {
+      rows.push({
+        key: cursor,
+        start: cursor,
+        end: monthDay(year, month + 1, 1),
+        label:
+          index === 0
+            ? "本月"
+            : index === 1
+              ? "上月"
+              : `${year}年${month + 1}月`,
+      });
+      cursor = monthDay(year, month - 1, 1);
+      continue;
+    }
+    rows.push({
+      key: cursor,
+      start: cursor,
+      end: monthDay(year + 1, 0, 1),
+      label: index === 0 ? "今年" : index === 1 ? "去年" : `${year}年`,
+    });
+    cursor = monthDay(year - 1, 0, 1);
+  }
+  return rows;
+}

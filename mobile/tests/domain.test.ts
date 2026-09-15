@@ -3,11 +3,16 @@ import test from "node:test";
 
 import {
   budgetPeriodRange,
+  calendarPeriodOptions,
   cycleRange,
   normalizeDateInput,
   validDate,
 } from "../src/domain/dates";
-import { budgetTone, parseMoneyExpression } from "../src/domain/money";
+import {
+  budgetTone,
+  parseMoneyExpression,
+  spendablePresentation,
+} from "../src/domain/money";
 
 test("金额算式保持精确并只在最后舍入到分", () => {
   assert.equal(parseMoneyExpression("12.5+8+6*2"), 3250n);
@@ -66,4 +71,32 @@ test("预算颜色从正常到深度超支分级且带文字", () => {
 test("工资分配允许零值保留金额，不在页面初次渲染时抛错", () => {
   assert.equal(parseMoneyExpression("0", { zero: true }), 0n);
   assert.throws(() => parseMoneyExpression("0"), /金额超出允许范围/);
+});
+
+test("安心支出状态取预算比例和消费账户覆盖比例中较低的一项", () => {
+  assert.equal(spendablePresentation(800000, 1000000, 1000000).key, "SAFE");
+  assert.equal(spendablePresentation(800000, 1000000, 0).key, "NO_FUNDS");
+  assert.equal(spendablePresentation(800000, 1000000, 200000).key, "LOW");
+  assert.equal(spendablePresentation(400000, 1000000, 1000000).key, "WATCH");
+  assert.equal(spendablePresentation(100000, 1000000, 1000000).key, "LIMIT");
+});
+
+test("周月年快捷周期只追溯到首次记账所在周期", () => {
+  const weeks = calendarPeriodOptions("week", "2026-08-21", "2026-09-15");
+  assert.equal(weeks[0].label, "本周");
+  assert.equal(weeks[1].label, "上周");
+  assert.ok(weeks.at(-1)!.start <= "2026-08-21");
+  assert.ok(weeks.at(-1)!.end > "2026-08-21");
+  assert.deepEqual(
+    calendarPeriodOptions("month", "2026-05-21", "2026-09-15").map(
+      (item) => item.label,
+    ),
+    ["本月", "上月", "2026年7月", "2026年6月", "2026年5月"],
+  );
+  assert.deepEqual(
+    calendarPeriodOptions("year", "2024-08-09", "2026-09-15").map(
+      (item) => item.label,
+    ),
+    ["今年", "去年", "2024年"],
+  );
 });

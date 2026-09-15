@@ -24,7 +24,7 @@ import {
 import { radius, spacing, useAppTheme } from "@/constants/theme";
 import { useFinance } from "@/data/finance-context";
 import { addDays } from "@/domain/dates";
-import { budgetTone, formatMoney } from "@/domain/money";
+import { budgetTone, formatMoney, spendablePresentation } from "@/domain/money";
 
 const kindLabel = {
   INCOME: "收入",
@@ -50,36 +50,22 @@ export default function HomeScreen() {
 
   const hidden = !snapshot.settings.amountsVisible;
   const safe = snapshot.summary.safeToSpendMinor;
-  const safeTone = budgetTone(
-    snapshot.summary.netExpenseMinor,
-    snapshot.summary.budgetMinor,
-  );
   const remaining = snapshot.summary.remainingBudgetMinor;
-  const safeState =
-    remaining < 0
-      ? {
-          title: "本期预算已超支",
-          hint: `已超支 ${formatMoney(Math.abs(remaining))}，建议暂停非必要支出`,
-          amount: Math.abs(remaining),
-        }
-      : remaining === 0 && snapshot.summary.budgetMinor > 0
-        ? {
-            title: "本期预算已用完",
-            hint: "可用预算为 0，请留意后续支出",
-            amount: 0,
-          }
-        : {
-            title: "当前可安心支出",
-            hint: "按预算与账户真实余额共同约束",
-            amount: safe,
-          };
+  const safeState = spendablePresentation(
+    remaining,
+    snapshot.summary.budgetMinor,
+    snapshot.summary.spendingBalanceMinor,
+    snapshot.accounts.some((account) => account.roles.includes("SPENDING")),
+  );
+  const safeAmount =
+    safeState.key === "OVER_BUDGET" ? Math.abs(remaining) : safe;
   const topBudgets = snapshot.budgets.slice(0, width >= 700 ? 6 : 4);
   const recent = snapshot.transactions.slice(0, 5);
 
   const explainSafe = () =>
     Alert.alert(
-      safeState.title,
-      "预算未用完时，取“本期剩余预算”和“主要消费账户可用余额”中较小的非负值；用完或超支后会切换为预算提醒。预算是计划额度，账户余额是真实资金，两者不会互相替代；转账到消费账户只改变资金位置，不会增加预算。",
+      safeState.label,
+      "预算未用完时，金额取“本期剩余预算”和“主要消费账户可用余额”中较小的非负值。卡片颜色与提醒取预算剩余比例和消费账户覆盖比例中较低的一项；预算是计划额度，账户余额是真实资金，转账只改变资金位置。",
     );
 
   const goAdd = (kind: "EXPENSE" | "INCOME" | "TRANSFER") => {
@@ -146,14 +132,14 @@ export default function HomeScreen() {
       <Card
         style={[
           styles.hero,
-          { backgroundColor: safeTone.color, borderColor: safeTone.color },
+          { backgroundColor: safeState.color, borderColor: safeState.color },
         ]}
       >
         <View style={styles.heroTop}>
           <View>
-            <Text style={styles.heroLabel}>{safeState.title}</Text>
+            <Text style={styles.heroLabel}>{safeState.label}</Text>
             <MoneyAmount
-              value={safeState.amount}
+              value={safeAmount}
               hidden={hidden}
               size={34}
               color="#FFFFFF"
@@ -195,19 +181,42 @@ export default function HomeScreen() {
         </Text>
       </Card>
 
-      {(snapshot.summary.receivableOverdueCount > 0 || snapshot.summary.receivableDueTodayCount > 0) ? (
-        <Pressable onPress={() => router.push("/receivables" as never)}
-          style={[styles.receivableNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Ionicons name="alert-circle-outline" size={22} color={snapshot.summary.receivableOverdueCount ? colors.expense : colors.primary} />
+      {snapshot.summary.receivableOverdueCount > 0 ||
+      snapshot.summary.receivableDueTodayCount > 0 ? (
+        <Pressable
+          onPress={() => router.push("/receivables" as never)}
+          style={[
+            styles.receivableNotice,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Ionicons
+            name="alert-circle-outline"
+            size={22}
+            color={
+              snapshot.summary.receivableOverdueCount
+                ? colors.expense
+                : colors.primary
+            }
+          />
           <View style={{ flex: 1 }}>
             <Text style={[styles.itemTitle, { color: colors.text }]}>
-              {snapshot.summary.receivableOverdueCount ? "有待收款已逾期" : "有待收款今日到期"}
+              {snapshot.summary.receivableOverdueCount
+                ? "有待收款已逾期"
+                : "有待收款今日到期"}
             </Text>
             <Text style={[styles.meta, { color: colors.textSecondary }]}>
-              {snapshot.summary.receivableOverdueCount ? snapshot.summary.receivableOverdueCount + " 笔已超过预计归还日" : snapshot.summary.receivableDueTodayCount + " 笔预计今天归还"}
+              {snapshot.summary.receivableOverdueCount
+                ? snapshot.summary.receivableOverdueCount +
+                  " 笔已超过预计归还日"
+                : snapshot.summary.receivableDueTodayCount + " 笔预计今天归还"}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.textSecondary}
+          />
         </Pressable>
       ) : null}
 
@@ -419,7 +428,15 @@ const styles = StyleSheet.create({
   },
   itemTitle: { fontSize: 15, fontWeight: "700" },
   amountPair: { fontSize: 12, fontVariant: ["tabular-nums"] },
-  receivableNotice: { minHeight: 66, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  receivableNotice: {
+    minHeight: 66,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
   transactionRow: {
     minHeight: 70,
     paddingHorizontal: spacing.lg,

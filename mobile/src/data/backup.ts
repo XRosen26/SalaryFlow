@@ -38,7 +38,7 @@ type BackupBase = {
   formatVersion: 1;
   schemaVersion: 4;
   createdAt: string;
-  source: { platform: "mobile"; appVersion: "0.5.1" };
+  source: { platform: "mobile"; appVersion: "0.6.0" };
   tables: Record<TableName, BackupRow[]>;
 };
 
@@ -67,7 +67,7 @@ export async function buildBackup(db: SQLiteDatabase): Promise<BackupDocument> {
     formatVersion: 1,
     schemaVersion: 4,
     createdAt: new Date().toISOString(),
-    source: { platform: "mobile", appVersion: "0.5.1" },
+    source: { platform: "mobile", appVersion: "0.6.0" },
     tables,
   };
   return {
@@ -139,7 +139,10 @@ async function parseBackup(text: string): Promise<BackupDocument> {
   assertRecord(value.tables, "备份缺少数据表");
   assertRecord(value.integrity, "备份缺少完整性校验");
   for (const table of TABLES) {
-    if (!Array.isArray(value.tables[table]) && !["receivables", "receivable_repayments"].includes(table))
+    if (
+      !Array.isArray(value.tables[table]) &&
+      !["receivables", "receivable_repayments"].includes(table)
+    )
       throw new Error(`备份缺少 ${table} 数据`);
   }
   const document = value as unknown as BackupDocument;

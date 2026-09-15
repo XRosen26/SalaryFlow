@@ -1,6 +1,13 @@
 import { useSQLiteContext } from "expo-sqlite";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 
 import {
@@ -10,13 +17,31 @@ import {
   MoneyAmount,
   PageHeader,
 } from "@/components/ui";
+import { DateField } from "@/components/date-field";
 import { radius, spacing, useAppTheme } from "@/constants/theme";
 import { useFinance } from "@/data/finance-context";
 import { loadAnalytics, type AnalyticsSnapshot } from "@/data/repository";
-import { addDays, today } from "@/domain/dates";
+import {
+  addDays,
+  calendarPeriodOptions,
+  normalizeDateInput,
+  today,
+  type CalendarPeriodOption,
+  type CalendarPeriodUnit,
+} from "@/domain/dates";
 import { formatMoney } from "@/domain/money";
 
-type Range = "CYCLE" | "TODAY" | "3D" | "7D" | "30D" | "90D" | "MONTH" | "YEAR";
+type Range =
+  | "CYCLE"
+  | "TODAY"
+  | "3D"
+  | "7D"
+  | "30D"
+  | "90D"
+  | "MONTH"
+  | "YEAR"
+  | "CUSTOM"
+  | "PERIOD";
 type Dimension = "EXPENSE" | "INCOME" | "BUDGET";
 type ChartView = "DONUT" | "BAR";
 type TrendSeries = "BOTH" | "INCOME" | "EXPENSE";
@@ -39,6 +64,7 @@ const rangeOptions: { id: Range; label: string }[] = [
   { id: "90D", label: "近90天" },
   { id: "MONTH", label: "本月" },
   { id: "YEAR", label: "本年" },
+  { id: "CUSTOM", label: "自定义" },
 ];
 const dimensionOptions: { id: Dimension; label: string }[] = [
   { id: "EXPENSE", label: "支出" },
@@ -88,14 +114,33 @@ export default function AnalyticsScreen() {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [data, setData] = useState<AnalyticsSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [periodUnit, setPeriodUnit] = useState<CalendarPeriodUnit>("week");
+  const [periodChoice, setPeriodChoice] = useState<CalendarPeriodOption | null>(
+    null,
+  );
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const [customStart, setCustomStart] = useState(today());
+  const [customEnd, setCustomEnd] = useState(today());
+  const [appliedCustom, setAppliedCustom] = useState({
+    start: today(),
+    end: today(),
+  });
+  const [customError, setCustomError] = useState("");
+
+  const periodOptions = useMemo(
+    () =>
+      snapshot
+        ? calendarPeriodOptions(periodUnit, snapshot.ledgerStartDate, today())
+        : [],
+    [periodUnit, snapshot],
+  );
 
   const dates = useMemo(() => {
     if (!snapshot) return null;
     const now = today();
     if (range === "CYCLE")
       return { start: snapshot.cycle.start, end: snapshot.cycle.end };
-    if (range === "TODAY")
-      return { start: now, end: addDays(now, 1) };
+    if (range === "TODAY") return { start: now, end: addDays(now, 1) };
     if (range === "3D")
       return { start: addDays(now, -2), end: addDays(now, 1) };
     if (range === "7D")
@@ -109,9 +154,16 @@ export default function AnalyticsScreen() {
         start: now.slice(0, 4) + "-01-01",
         end: String(Number(now.slice(0, 4)) + 1) + "-01-01",
       };
+    if (range === "CUSTOM")
+      return {
+        start: appliedCustom.start,
+        end: addDays(appliedCustom.end, 1),
+      };
+    if (range === "PERIOD" && periodChoice)
+      return { start: periodChoice.start, end: periodChoice.end };
     const start = now.slice(0, 7) + "-01";
     return { start, end: nextMonthStart(start) };
-  }, [range, snapshot]);
+  }, [appliedCustom, periodChoice, range, snapshot]);
 
   useEffect(() => {
     if (!dates) return;
@@ -123,6 +175,21 @@ export default function AnalyticsScreen() {
         setLoadError(reason instanceof Error ? reason.message : "统计失败"),
       );
   }, [db, dates]);
+
+  const applyCustomRange = () => {
+    try {
+      const start = normalizeDateInput(customStart);
+      const end = normalizeDateInput(customEnd);
+      if (start > end) throw new Error("开始日期不能晚于结束日期");
+      setCustomStart(start);
+      setCustomEnd(end);
+      setAppliedCustom({ start, end });
+      setCustomError("");
+      setRange("CUSTOM");
+    } catch (reason) {
+      setCustomError(reason instanceof Error ? reason.message : "日期无效");
+    }
+  };
 
   const chartRows = useMemo<ChartRow[]>(() => {
     if (!snapshot || !data) return [];
@@ -236,14 +303,189 @@ export default function AnalyticsScreen() {
         ))}
       </View>
 
+      <Card style={styles.rangeCard}>
+        <Text style={[styles.rangeTitle, { color: colors.text }]}>
+          按日历周期快速查看
+        </Text>
+        <Text style={[styles.muted, { color: colors.textSecondary }]}>
+          只列出从首次记账日期到当前的周、月和年。
+        </Text>
+        <View style={styles.quickPeriodRow}>
+          {(
+            [
+              ["week", "周"],
+              ["month", "月"],
+              ["year", "年"],
+            ] as [CalendarPeriodUnit, string][]
+          ).map(([unit, label]) => (
+            <Chip
+              key={unit}
+              label={label}
+              active={periodUnit === unit}
+              onPress={() => {
+                setPeriodUnit(unit);
+                setPeriodChoice(null);
+              }}
+            />
+          ))}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="选择具体日历周期"
+            onPress={() => setPeriodOpen(true)}
+            style={[
+              styles.periodSelector,
+              {
+                backgroundColor:
+                  range === "PERIOD" ? colors.primarySoft : colors.surface,
+                borderColor:
+                  range === "PERIOD" ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.periodSelectorText, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {periodChoice?.label ??
+                `选择具体${periodUnit === "week" ? "周" : periodUnit === "month" ? "月" : "年"}`}
+            </Text>
+            <Text style={{ color: colors.textSecondary }}>⌄</Text>
+          </Pressable>
+        </View>
+      </Card>
+
+      {range === "CUSTOM" ? (
+        <Card style={styles.rangeCard}>
+          <Text style={[styles.rangeTitle, { color: colors.text }]}>
+            自定义时间范围
+          </Text>
+          <View style={styles.customDates}>
+            <DateField
+              label="开始日期"
+              value={customStart}
+              onChange={setCustomStart}
+              style={styles.customDate}
+            />
+            <DateField
+              label="结束日期"
+              value={customEnd}
+              onChange={setCustomEnd}
+              style={styles.customDate}
+            />
+          </View>
+          {customError ? (
+            <Text style={[styles.muted, { color: colors.expense }]}>
+              {customError}
+            </Text>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={applyCustomRange}
+            style={[styles.applyButton, { backgroundColor: colors.primary }]}
+          >
+            <Text style={styles.applyButtonText}>应用自定义范围</Text>
+          </Pressable>
+        </Card>
+      ) : null}
+
+      <Modal
+        visible={periodOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setPeriodOpen(false)}
+      >
+        <View
+          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPeriodOpen(false)}
+            accessibilityLabel="关闭周期选择"
+          />
+          <View
+            style={[
+              styles.periodDialog,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.title, { color: colors.text }]}>
+              选择
+              {periodUnit === "week"
+                ? "周"
+                : periodUnit === "month"
+                  ? "月"
+                  : "年"}
+            </Text>
+            <Text style={[styles.muted, { color: colors.textSecondary }]}>
+              按时间倒序排列，起点为首次记账所在周期。
+            </Text>
+            <ScrollView
+              style={styles.periodList}
+              contentContainerStyle={styles.periodListContent}
+            >
+              {periodOptions.map((item) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => {
+                    setPeriodChoice(item);
+                    setRange("PERIOD");
+                    setPeriodOpen(false);
+                  }}
+                  style={[
+                    styles.periodOption,
+                    { borderBottomColor: colors.border },
+                    periodChoice?.key === item.key && {
+                      backgroundColor: colors.primarySoft,
+                    },
+                  ]}
+                >
+                  <View>
+                    <Text
+                      style={[styles.periodOptionTitle, { color: colors.text }]}
+                    >
+                      {item.label}
+                    </Text>
+                    <Text
+                      style={[styles.muted, { color: colors.textSecondary }]}
+                    >
+                      {item.start} 至 {addDays(item.end, -1)}
+                    </Text>
+                  </View>
+                  {periodChoice?.key === item.key ? (
+                    <Text style={{ color: colors.primary, fontWeight: "900" }}>
+                      ✓
+                    </Text>
+                  ) : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.metrics}>
         <Card style={styles.metric}>
-          <Text style={[styles.muted, { color: colors.textSecondary }]}>今日支出</Text>
-          <MoneyAmount value={snapshot.summary.todayExpenseMinor} hidden={hidden} size={20} color={colors.expense} />
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>
+            今日支出
+          </Text>
+          <MoneyAmount
+            value={snapshot.summary.todayExpenseMinor}
+            hidden={hidden}
+            size={20}
+            color={colors.expense}
+          />
         </Card>
         <Card style={styles.metric}>
-          <Text style={[styles.muted, { color: colors.textSecondary }]}>最近3天支出</Text>
-          <MoneyAmount value={snapshot.summary.threeDayExpenseMinor} hidden={hidden} size={20} color={colors.expense} />
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>
+            最近3天支出
+          </Text>
+          <MoneyAmount
+            value={snapshot.summary.threeDayExpenseMinor}
+            hidden={hidden}
+            size={20}
+            color={colors.expense}
+          />
         </Card>
         <Card style={styles.metric}>
           <Text style={[styles.muted, { color: colors.textSecondary }]}>
@@ -819,4 +1061,65 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   detailNet: { fontSize: 12, fontWeight: "800" },
+  rangeCard: { gap: spacing.md },
+  rangeTitle: { fontSize: 15, fontWeight: "900" },
+  quickPeriodRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  periodSelector: {
+    minHeight: 42,
+    minWidth: 178,
+    flexGrow: 1,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  periodSelectorText: { flex: 1, fontSize: 14, fontWeight: "800" },
+  customDates: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  customDate: { minWidth: 210, flex: 1 },
+  applyButton: {
+    minHeight: 44,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-end",
+  },
+  applyButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
+  modalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  periodDialog: {
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "78%",
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  periodList: { marginTop: spacing.sm },
+  periodListContent: { paddingBottom: spacing.sm },
+  periodOption: {
+    minHeight: 62,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  periodOptionTitle: { fontSize: 15, fontWeight: "900" },
 });

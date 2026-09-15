@@ -1,0 +1,32 @@
+# Dependencies and generated native projects
+node_modules/
+/android/
+/ios/
+
+# Local Expo, Metro, Gradle and task caches
+.expo/
+.expo-export-check/
+.gradle-user-home/
+.local/
+.local-temp/
+dist/
+dist-ios/
+web-build/
+.metro-health-check*
+*.tsbuildinfo
+*.log
+
+# Local release artifacts and credentials
+release/
+*.jks
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+.env*
+!.env.example
+
+# Repository and OS metadata
+.git/
+.DS_Store

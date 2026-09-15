@@ -464,9 +464,25 @@ h2,
   min-height: 40px;
   border-radius: 7px;
 }
-.receivable-alert { width: 100%; margin-bottom: 16px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; text-align: left; border-color: var(--border); background: var(--surface); }
-.receivable-alert span { flex: 1; display: grid; gap: 3px; }
-.receivable-alert strong { color: var(--danger); }
+.receivable-alert {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border-color: var(--border);
+  background: var(--surface);
+}
+.receivable-alert span {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+.receivable-alert strong {
+  color: var(--danger);
+}
 
 .overview-top {
   display: grid;
@@ -962,10 +978,23 @@ h2,
   border-radius: 14px;
   background: var(--soft);
 }
-.range-filter-box label { display: grid; gap: 5px; }
-.range-filter-box label span { font-size: 12px; color: var(--muted); }
-.range-filter-box input, .range-filter-box select { min-width: 0; }
-@media (max-width: 1320px) { .range-filter-box { grid-template-columns: repeat(3, minmax(150px, 1fr)); } }
+.range-filter-box label {
+  display: grid;
+  gap: 5px;
+}
+.range-filter-box label span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.range-filter-box input,
+.range-filter-box select {
+  min-width: 0;
+}
+@media (max-width: 1320px) {
+  .range-filter-box {
+    grid-template-columns: repeat(3, minmax(150px, 1fr));
+  }
+}
 
 .filters {
   display: flex;
@@ -3323,20 +3352,61 @@ button.danger-button:hover {
   fill: #a6c2aa;
 }
 
-.receivable-due { border-left: 4px solid transparent; }
-.receivable-due.later { border-left-color: #32a071; background: color-mix(in srgb, #32a071 6%, transparent); }
-.receivable-due.day3 { border-left-color: #84ad0a; background: color-mix(in srgb, #84ad0a 8%, transparent); }
-.receivable-due.day2 { border-left-color: #eaaa08; background: color-mix(in srgb, #eaaa08 9%, transparent); }
-.receivable-due.day1 { border-left-color: #f79009; background: color-mix(in srgb, #f79009 10%, transparent); }
-.receivable-due.today { border-left-color: #f04438; background: color-mix(in srgb, #f04438 11%, transparent); font-weight: 700; }
-.receivable-due.overdue { border-left-color: #991b1b; background: color-mix(in srgb, #991b1b 12%, transparent); font-weight: 700; }
-.receivable-status.later { color: #217a55; }
-.receivable-status.day3 { color: #668000; }
-.receivable-status.day2 { color: #946200; }
-.receivable-status.day1 { color: #b54708; }
-.receivable-status.today { color: #c4320a; font-weight: 900; }
-.receivable-status.overdue { color: #991b1b; font-weight: 900; }
-.receivable-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.receivable-due {
+  border-left: 4px solid transparent;
+}
+.receivable-due.later {
+  border-left-color: #32a071;
+  background: color-mix(in srgb, #32a071 6%, transparent);
+}
+.receivable-due.day3 {
+  border-left-color: #84ad0a;
+  background: color-mix(in srgb, #84ad0a 8%, transparent);
+}
+.receivable-due.day2 {
+  border-left-color: #eaaa08;
+  background: color-mix(in srgb, #eaaa08 9%, transparent);
+}
+.receivable-due.day1 {
+  border-left-color: #f79009;
+  background: color-mix(in srgb, #f79009 10%, transparent);
+}
+.receivable-due.today {
+  border-left-color: #f04438;
+  background: color-mix(in srgb, #f04438 11%, transparent);
+  font-weight: 700;
+}
+.receivable-due.overdue {
+  border-left-color: #991b1b;
+  background: color-mix(in srgb, #991b1b 12%, transparent);
+  font-weight: 700;
+}
+.receivable-status.later {
+  color: #217a55;
+}
+.receivable-status.day3 {
+  color: #668000;
+}
+.receivable-status.day2 {
+  color: #946200;
+}
+.receivable-status.day1 {
+  color: #b54708;
+}
+.receivable-status.today {
+  color: #c4320a;
+  font-weight: 900;
+}
+.receivable-status.overdue {
+  color: #991b1b;
+  font-weight: 900;
+}
+.receivable-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 /* Desktop readability: keep supporting text legible on high-DPI Windows displays. */
 small {
@@ -3401,4 +3471,96 @@ th {
   padding: 4px 9px;
   font-size: 11px;
   line-height: 14px;
+}
+
+/* v0.9 readability and calendar-period controls */
+.calendar-quick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-right: 12px;
+  margin-right: 3px;
+  border-right: 1px solid var(--border);
+}
+.calendar-unit-buttons {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-soft);
+}
+.calendar-unit-buttons button {
+  min-width: 38px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 750;
+}
+.calendar-unit-buttons button.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.calendar-quick > select {
+  min-width: 250px;
+  max-width: 390px;
+}
+.spendable-hint {
+  display: block;
+  margin-top: 3px;
+  max-width: 220px;
+  color: #fff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.45;
+  opacity: 0.86;
+}
+.app-shell small,
+.app-shell th {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.app-shell .brand small,
+.app-shell .workspace-label,
+.app-shell .local-note small,
+.app-shell .profile small,
+.app-shell .breadcrumb,
+.app-shell .local-status,
+.app-shell .eyebrow {
+  font-size: 12.5px;
+}
+.app-shell .panel-heading p,
+.app-shell .notice span,
+.app-shell .notice button,
+.app-shell .table-footer,
+.app-shell .range-panel .muted,
+.app-shell .account-card > p,
+.app-shell .account-date,
+.app-shell .account-tools button,
+.app-shell .composition-bar-label > span {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.app-shell .tag {
+  font-size: 11.5px;
+}
+@media (max-width: 980px) {
+  .calendar-quick {
+    width: 100%;
+    padding-right: 0;
+    margin-right: 0;
+    padding-bottom: 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .calendar-quick > select {
+    flex: 1;
+    min-width: 210px;
+  }
 }

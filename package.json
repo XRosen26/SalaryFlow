@@ -1,7 +1,7 @@
 {
   "name": "salaryflow",
   "productName": "薪流 SalaryFlow",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "本地个人预算、现金流与储蓄管理",
   "author": "SalaryFlow",
   "license": "UNLICENSED",

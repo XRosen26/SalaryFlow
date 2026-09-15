@@ -42,5 +42,9 @@ yarn-error.*
 /android
 # generated verification and local install artifacts
 .expo-export-check/
+.gradle-user-home/
+.local/
+.local-temp/
+dist-ios/
 release/*.apk
 release/*.sha256

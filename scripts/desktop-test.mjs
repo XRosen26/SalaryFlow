@@ -149,12 +149,20 @@ try {
       await page.getByRole("button", { name: "清除范围", exact: true }).click();
     }
     if (name === "待收款") {
-      await page.getByRole("heading", { name: "待收款", exact: true, level: 1 }).waitFor();
-      await page.getByRole("button", { name: "新增待收款", exact: true }).click();
+      await page
+        .getByRole("heading", { name: "待收款", exact: true, level: 1 })
+        .waitFor();
+      await page
+        .getByRole("button", { name: "新增待收款", exact: true })
+        .click();
       const receivableDialog = page.getByRole("dialog");
-      await receivableDialog.getByLabel("借给谁 / 对方名称").fill("桌面验收联系人");
+      await receivableDialog
+        .getByLabel("借给谁 / 对方名称")
+        .fill("桌面验收联系人");
       await receivableDialog.getByLabel("借出金额（元）").fill("20+10");
-      await receivableDialog.getByRole("button", { name: "确认借出", exact: true }).click();
+      await receivableDialog
+        .getByRole("button", { name: "确认借出", exact: true })
+        .click();
       await page.getByText("桌面验收联系人", { exact: true }).waitFor();
     }
     if (name === "帮助与使用手册") {
@@ -171,6 +179,19 @@ try {
       );
     }
     if (name === "统计分析") {
+      const periodSelect = page.getByLabel("选择具体日历周期");
+      assert(
+        (await periodSelect.locator("option").count()) > 1,
+        "快捷周期没有生成可选项",
+      );
+      const firstPeriod = await periodSelect
+        .locator("option")
+        .nth(1)
+        .getAttribute("value");
+      assert(firstPeriod, "快捷周期首项缺少日期值");
+      await periodSelect.selectOption(firstPeriod);
+      await page.waitForTimeout(150);
+      assert.equal(await periodSelect.inputValue(), firstPeriod);
       assert(
         (await page.locator(".chart-value-label").count()) > 0,
         "趋势图没有直接金额标签",
@@ -311,7 +332,7 @@ try {
     .getByRole("button", { name: "总览", exact: true })
     .click();
   const safeSpendTip = page.locator(
-    '.help-tip[aria-label="取本周期剩余预算与主要消费账户可用余额中较小的非负值"]',
+    '.help-tip[aria-label="可支出金额取剩余预算与主要消费账户余额的较小非负值；颜色再取预算剩余比例与账户覆盖比例中较低的一项"]',
   );
   await safeSpendTip.hover();
   const safeSpendBubble = page.locator(".tooltip-portal");
@@ -370,6 +391,7 @@ try {
           "周期预算环形图和条形图",
           "六套配色与浅深主题实时更新圆环色板",
           "收入与净支出构成维度",
+          "从首次记账日期生成的周月年快捷周期",
         ],
         dataDir: env.SALARYFLOW_DATA_DIR,
       },

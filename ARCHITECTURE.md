@@ -1,11 +1,17 @@
 # 薪流 SalaryFlow · 技术、数据库与验证设计
 
+## 0.9统计边界与展示状态实现补充
+
+- `ledgerStartDate` 是快照派生字段，取未删除交易的最早 `transaction_date` 与未删除账户的最早 `start_date` 中较早者；不建立重复交易或统计周期表。
+- 周期选择器在表现层按本地日历生成半开区间 `[start,end)`；自然周以周一开始并使用ISO周年，月和年按自然边界。截止日期在界面显示为 `end-1 day`。
+- “安心支出”金额沿用整数分的 `max(0,min(remainingBudget,spendingBalance))`。颜色使用只读派生比例，不参与余额、预算或交易计算；缺少预算/账户和零值使用显式状态，避免除零或错误绿色。
+- 本次只增加快照派生字段、界面状态和日期选择逻辑，不改变表结构，PC schema 6与移动schema 4保持不变。
+
 ## 0.8.1实现补充
 
 数据库schema 5新增`receivables`与`receivable_repayments`。每次借出/归还与一条`ADJUSTMENT`资金记录一一关联，在同一SQLite事务内写入；schema 6为待收款增加软删除标记，撤销时原子软删除全部关联资金记录并保留审计；报表只聚合INCOME/EXPENSE/REFUND，因此不会污染收支。金额仍为整数分，余额不足、超额归还、日期和revision均在提交前校验。
 
 移动schema 3采用相同两表、资金口径与待收款软删除机制。Android/iOS共用Expo SDK 57工程、SQLite仓储和页面代码；iOS使用固定Bundle ID `com.xrosen26.salaryflow`，当前Windows环境完成bundle导出，原生签名留给macOS/Xcode。
-
 
 0.5增量：settings JSON增加amount_visibility，包含master、overview三卡和动态account id映射，兼容旧hide_amounts；显示判定不参与金额计算。setPayday以IMMEDIATE/NEXT_WEEK显式模式更新开放周期和cycle_rules，事务内验证交易范围及结算快照。resetLedger在主进程原生二次确认后关闭SQLite，限定路径删除主库/WAL/SHM和可选的SalaryFlow命名备份，再创建空账本并重载；schema保持3。
 
@@ -390,7 +396,7 @@ CSV文本字段遇=、+、−、@或前导控制字符等潜在公式前缀时�
 | M6 打包与试用准备     |           4—6日 | 安装包、升级说明、使用指南、已知问题清单                         | 干净Windows环境安装/升级/卸载保留数据通过；真实备份恢复演练      |
 | M7 实际使用与迭代     | 至少1个工资周期 | 用户真实试用反馈、问题优先级、CHANGELOG                          | 每周自查与周期结算一致，再决定P1                                 |
 
-M0以后必须先获得方案确认。M7是建议用户试用安排，本轮未创建任何定时任务，也不声称应用已经能使用。实际数据首次进入应用前必须有原账单副本，试用期间可与原记录核对。
+该表保留最初计划基线。用户已确认方案并授权持续实现；当前已进入M7实际试用与迭代，Windows与Android预览包可用，具体通过项、未签名状态和真机验证边界以VALIDATION记录为准。实际数据首次进入应用前仍建议保留原账单副本，并在早期试用期间交叉核对。
 
 发布门槛：所有P0金额与一致性测试通过；无会导致重复记账/错误余额/不可恢复丢失数据的已知问题；已发布schema迁移覆盖完整；安装包在无开发环境的机器验证；自动备份与手工恢复实际演练；数据路径、版本、导出口径和未支持功能写清楚。
 

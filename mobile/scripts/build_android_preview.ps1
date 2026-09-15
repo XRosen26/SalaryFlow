@@ -13,6 +13,10 @@ $appVersion = (Get-Content -Raw -LiteralPath (Join-Path $mobileRoot 'package.jso
 Push-Location $mobileRoot
 try {
   $env:NODE_ENV = 'production'
+  $env:GRADLE_USER_HOME = Join-Path $mobileRoot '.gradle-user-home'
+  $env:TEMP = Join-Path $mobileRoot '.local-temp'
+  $env:TMP = $env:TEMP
+  New-Item -ItemType Directory -Path $env:GRADLE_USER_HOME, $env:TEMP -Force | Out-Null
   & npx.cmd expo prebuild --platform android --clean --no-install
   if ($LASTEXITCODE -ne 0) { throw 'Expo Android 预构建失败' }
 
