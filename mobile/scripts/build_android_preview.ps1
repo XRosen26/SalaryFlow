@@ -13,12 +13,16 @@ $appVersion = (Get-Content -Raw -LiteralPath (Join-Path $mobileRoot 'package.jso
 Push-Location $mobileRoot
 try {
   $env:NODE_ENV = 'production'
-  $env:GRADLE_USER_HOME = Join-Path $mobileRoot '.gradle-user-home'
+  $env:GRADLE_USER_HOME = Join-Path $mobileRoot '.g'
   $env:TEMP = Join-Path $mobileRoot '.local-temp'
   $env:TMP = $env:TEMP
   New-Item -ItemType Directory -Path $env:GRADLE_USER_HOME, $env:TEMP -Force | Out-Null
   & npx.cmd expo prebuild --platform android --clean --no-install
   if ($LASTEXITCODE -ne 0) { throw 'Expo Android 预构建失败' }
+  $wrapperProperties = Join-Path $androidRoot 'gradle\wrapper\gradle-wrapper.properties'
+  if ((Get-Content -Raw -LiteralPath $wrapperProperties) -notmatch '(?m)^networkTimeout=') {
+    Add-Content -LiteralPath $wrapperProperties -Value 'networkTimeout=600000' -Encoding ascii
+  }
 
   $jdkCandidates = @(
     $env:JAVA_HOME,

@@ -1579,13 +1579,38 @@ export type BillOccurrenceItem = {
   dueDate: string;
   frequency: "MONTHLY" | "WEEKLY";
 };
+
+export type BillRuleItem = {
+  id: string;
+  name: string;
+  amountMinor: number;
+  accountId: string;
+  accountName: string;
+  categoryId: string;
+  categoryName: string;
+  frequency: "MONTHLY" | "WEEKLY";
+  day: number;
+  revision: number;
+};
+
+type BillInput = {
+  id?: string;
+  revision?: number;
+  name: string;
+  amountMinor: number;
+  accountId: string;
+  categoryId: string;
+  frequency: "MONTHLY" | "WEEKLY";
+  day: number;
+};
+
 function nextBillDate(
   frequency: "MONTHLY" | "WEEKLY",
   day: number,
   from: string,
 ) {
   validDate(from);
-  const d = new Date(`${from}T00:00:00Z`);
+  const d = new Date(from + "T00:00:00Z");
   if (frequency === "MONTHLY") {
     let candidate = monthDay(d.getUTCFullYear(), d.getUTCMonth(), day);
     if (candidate < from)
@@ -1595,17 +1620,8 @@ function nextBillDate(
   const weekday = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
   return addDays(from, (day - weekday + 7) % 7);
 }
-export async function saveBill(
-  db: SQLiteDatabase,
-  input: {
-    name: string;
-    amountMinor: number;
-    accountId: string;
-    categoryId: string;
-    frequency: "MONTHLY" | "WEEKLY";
-    day: number;
-  },
-) {
+
+function validateBill(input: BillInput) {
   const name = input.name.trim();
   if (!name) throw new Error("请输入账单名称");
   if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0)
@@ -1615,9 +1631,131 @@ export async function saveBill(
     throw new Error(
       input.frequency === "MONTHLY" ? "每月日期应为 1—31" : "星期应为 1—7",
     );
-  const billId = id("bill");
-  const due = nextBillDate(input.frequency, input.day, today());
+  if (!input.accountId) throw new Error("请选择付款账户");
+  if (!input.categoryId) throw new Error("请选择支出分类");
+  return name;
+}
+
+async function validateBillReferences(
+  tx: SQLiteDatabase,
+  accountId: string,
+  categoryId: string,
+) {
+  const account = await tx.getFirstAsync<{ id: string }>(
+    "SELECT id FROM accounts WHERE id=? AND deleted=0 AND archived=0",
+    accountId,
+  );
+  if (!account) throw new Error("付款账户不存在或已归档，请重新选择");
+  const category = await tx.getFirstAsync<{ id: string }>(
+    "SELECT id FROM categories WHERE id=? AND kind='EXPENSE' AND archived=0",
+    categoryId,
+  );
+  if (!category) throw new Error("支出分类不存在或已停用，请重新选择");
+}
+
+async function availableBillDate(
+  tx: SQLiteDatabase,
+  billId: string,
+  frequency: "MONTHLY" | "WEEKLY",
+  day: number,
+  from: string,
+  excludeOccurrenceId?: string,
+) {
+  let due = nextBillDate(frequency, day, from);
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const collision = await tx.getFirstAsync<{ id: string }>(
+      "SELECT id FROM bill_occurrences WHERE bill_id=? AND due_date=? AND id<>?",
+      billId,
+      due,
+      excludeOccurrenceId ?? "",
+    );
+    if (!collision) return due;
+    due = nextBillDate(frequency, day, addDays(due, 1));
+  }
+  throw new Error("无法安排下一次账单日期，请检查规则");
+}
+
+export async function loadBillRules(
+  db: SQLiteDatabase,
+): Promise<BillRuleItem[]> {
+  return db.getAllAsync<BillRuleItem>(
+    "SELECT b.id,b.name,b.amount_minor amountMinor,b.account_id accountId," +
+      "a.name accountName,b.category_id categoryId,cv.name categoryName," +
+      "b.frequency,b.day,b.revision " +
+      "FROM bills b " +
+      "JOIN accounts a ON a.id=b.account_id " +
+      "JOIN category_versions cv ON cv.category_id=b.category_id " +
+      "AND cv.version=(SELECT MAX(v.version) FROM category_versions v WHERE v.category_id=b.category_id) " +
+      "WHERE b.enabled=1 ORDER BY b.name,b.id",
+  );
+}
+
+export async function saveBill(db: SQLiteDatabase, input: BillInput) {
+  const name = validateBill(input);
+  const billId = input.id ?? id("bill");
   await db.withExclusiveTransactionAsync(async (tx) => {
+    await validateBillReferences(
+      tx as unknown as SQLiteDatabase,
+      input.accountId,
+      input.categoryId,
+    );
+    if (input.id) {
+      if (!Number.isInteger(input.revision))
+        throw new Error("账单版本无效，请刷新后重试");
+      const pending = await tx.getFirstAsync<{ id: string }>(
+        "SELECT id FROM bill_occurrences WHERE bill_id=? AND status='PENDING' ORDER BY due_date LIMIT 1",
+        input.id,
+      );
+      const due = await availableBillDate(
+        tx as unknown as SQLiteDatabase,
+        input.id,
+        input.frequency,
+        input.day,
+        today(),
+        pending?.id,
+      );
+      const changed = await tx.runAsync(
+        "UPDATE bills SET name=?,amount_minor=?,account_id=?,category_id=?," +
+          "frequency=?,day=?,enabled=1,revision=revision+1 " +
+          "WHERE id=? AND enabled=1 AND revision=?",
+        name,
+        input.amountMinor,
+        input.accountId,
+        input.categoryId,
+        input.frequency,
+        input.day,
+        input.id,
+        input.revision!,
+      );
+      if (changed.changes !== 1)
+        throw new Error("账单已被修改或删除，请刷新后重试");
+      if (pending) {
+        await tx.runAsync(
+          "UPDATE bill_occurrences SET due_date=?,name=?,amount_minor=?," +
+            "account_id=?,category_id=? WHERE id=? AND status='PENDING'",
+          due,
+          name,
+          input.amountMinor,
+          input.accountId,
+          input.categoryId,
+          pending.id,
+        );
+      } else {
+        await tx.runAsync(
+          "INSERT INTO bill_occurrences(id,bill_id,due_date,name,amount_minor,account_id,category_id,status) VALUES(?,?,?,?,?,?,?,'PENDING')",
+          id("bill-due"),
+          input.id,
+          due,
+          name,
+          input.amountMinor,
+          input.accountId,
+          input.categoryId,
+        );
+      }
+      return;
+    }
+
+    const due = nextBillDate(input.frequency, input.day, today());
     await tx.runAsync(
       "INSERT INTO bills(id,name,amount_minor,account_id,category_id,frequency,day,start_date,enabled,revision) VALUES(?,?,?,?,?,?,?,?,1,1)",
       billId,
@@ -1642,6 +1780,27 @@ export async function saveBill(
   });
   return billId;
 }
+
+export async function disableBill(
+  db: SQLiteDatabase,
+  billId: string,
+  revision: number,
+) {
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    const changed = await tx.runAsync(
+      "UPDATE bills SET enabled=0,revision=revision+1 WHERE id=? AND enabled=1 AND revision=?",
+      billId,
+      revision,
+    );
+    if (changed.changes !== 1)
+      throw new Error("账单已被修改或删除，请刷新后重试");
+    await tx.runAsync(
+      "UPDATE bill_occurrences SET status='SKIPPED' WHERE bill_id=? AND status='PENDING'",
+      billId,
+    );
+  });
+}
+
 export async function loadPendingBills(
   db: SQLiteDatabase,
 ): Promise<BillOccurrenceItem[]> {
@@ -1662,7 +1821,13 @@ export async function loadPendingBills(
       bill.id,
     );
     if (!pending) {
-      const due = nextBillDate(bill.frequency, bill.day, today());
+      const due = await availableBillDate(
+        db,
+        bill.id,
+        bill.frequency,
+        bill.day,
+        today(),
+      );
       await db.runAsync(
         "INSERT OR IGNORE INTO bill_occurrences(id,bill_id,due_date,name,amount_minor,account_id,category_id,status) VALUES(?,?,?,?,?,?,?,'PENDING')",
         id("bill-due"),
@@ -1676,9 +1841,17 @@ export async function loadPendingBills(
     }
   }
   return db.getAllAsync<BillOccurrenceItem>(
-    `SELECT o.id,o.bill_id billId,o.name,o.amount_minor amountMinor,o.account_id accountId,a.name accountName,o.category_id categoryId,cv.name categoryName,o.due_date dueDate,b.frequency FROM bill_occurrences o JOIN bills b ON b.id=o.bill_id JOIN accounts a ON a.id=o.account_id JOIN category_versions cv ON cv.category_id=o.category_id AND cv.version=(SELECT MAX(v.version) FROM category_versions v WHERE v.category_id=o.category_id) WHERE o.status='PENDING' ORDER BY o.due_date,o.name`,
+    "SELECT o.id,o.bill_id billId,o.name,o.amount_minor amountMinor," +
+      "o.account_id accountId,a.name accountName,o.category_id categoryId," +
+      "cv.name categoryName,o.due_date dueDate,b.frequency " +
+      "FROM bill_occurrences o JOIN bills b ON b.id=o.bill_id " +
+      "JOIN accounts a ON a.id=o.account_id " +
+      "JOIN category_versions cv ON cv.category_id=o.category_id " +
+      "AND cv.version=(SELECT MAX(v.version) FROM category_versions v WHERE v.category_id=o.category_id) " +
+      "WHERE o.status='PENDING' AND b.enabled=1 ORDER BY o.due_date,o.name",
   );
 }
+
 async function createNextBillOccurrence(
   tx: SQLiteDatabase,
   occurrence: {

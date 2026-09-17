@@ -100,6 +100,7 @@ const pages = [
   { key: "overview", label: msg("总览"), icon: LayoutDashboard },
   { key: "transactions", label: msg("交易记录"), icon: ArrowLeftRight },
   { key: "budget", label: msg("预算与周期"), icon: Wallet },
+  { key: "bills", label: msg("固定账单"), icon: CalendarDays },
   { key: "allocations", label: msg("工资分配"), icon: Sparkles },
   { key: "receivables", label: msg("待收款"), icon: Banknote },
   { key: "accounts", label: msg("我的账户"), icon: Landmark },
@@ -520,7 +521,9 @@ export default function App() {
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
-    [settingsTab, setSettingsTab] = useState("general"),
+    [settingsTab, setSettingsTab] = useState(
+      sessionStorage.getItem("salaryflow.settingsTab") || "general",
+    ),
     [budgetSort, setBudgetSort] = useState("default"),
     [expenseSort, setExpenseSort] = useState("amount_desc"),
     [incomeSort, setIncomeSort] = useState("amount_desc"),
@@ -706,6 +709,11 @@ export default function App() {
     setPage(key);
     setQuery(q);
     setRange("cycle");
+  }
+  function openSettingsTab(tab: string) {
+    sessionStorage.setItem("salaryflow.settingsTab", tab);
+    setSettingsTab(tab);
+    goto("settings");
   }
   async function showHistory(entity: string, id: string) {
     const history = await api("history", { entity, id });
@@ -1626,6 +1634,7 @@ export default function App() {
     accounts: msg("钱在哪里，一目了然。"),
     allocations: msg("工资到账后，补足生活资金，再安排储蓄与理财。"),
     analysis: msg("用真实记录，看见财务的变化。"),
+    bills: msg("管理重复规则、到期待办和处理历史。"),
     settings: msg("你的数据，由你掌握。"),
   };
   return (
@@ -1649,19 +1658,24 @@ export default function App() {
                 (
                   p.key === "help"
                     ? page === "settings" && settingsTab === "help"
-                    : p.key === "settings"
-                      ? page === "settings" && settingsTab !== "help"
-                      : page === p.key
+                    : p.key === "bills"
+                      ? page === "settings" && settingsTab === "bills"
+                      : p.key === "settings"
+                        ? page === "settings" &&
+                          !["help", "bills"].includes(settingsTab)
+                        : page === p.key
                 )
                   ? "selected"
                   : ""
               }
               onClick={() => {
                 if (p.key === "help") {
-                  setSettingsTab("help");
-                  goto("settings");
+                  openSettingsTab("help");
+                } else if (p.key === "bills") {
+                  openSettingsTab("bills");
+                } else if (p.key === "settings") {
+                  openSettingsTab("general");
                 } else {
-                  if (p.key === "settings") setSettingsTab("general");
                   goto(p.key);
                 }
               }}
@@ -1671,12 +1685,14 @@ export default function App() {
               {((p.key === "help" &&
                 page === "settings" &&
                 settingsTab === "help") ||
+                (p.key === "bills" &&
+                  page === "settings" &&
+                  settingsTab === "bills") ||
                 (p.key === "settings" &&
                   page === "settings" &&
-                  settingsTab !== "help") ||
-                (!["help", "settings"].includes(p.key) && page === p.key)) && (
-                <span className="nav-dot" />
-              )}
+                  !["help", "bills"].includes(settingsTab)) ||
+                (!["help", "bills", "settings"].includes(p.key) &&
+                  page === p.key)) && <span className="nav-dot" />}
             </button>
           ))}
         </nav>
@@ -1703,7 +1719,7 @@ export default function App() {
             </div>
             <button
               className="icon-button"
-              onClick={() => goto("settings")}
+              onClick={() => openSettingsTab("general")}
               aria-label={msg("打开设置")}
               title={msg("打开设置")}
             >
@@ -1720,7 +1736,9 @@ export default function App() {
             <b>
               {page === "settings" && settingsTab === "help"
                 ? msg("帮助与使用手册")
-                : pages.find((p) => p.key === page)?.label}
+                : page === "settings" && settingsTab === "bills"
+                  ? msg("固定账单")
+                  : pages.find((p) => p.key === page)?.label}
             </b>
           </div>
           <div className="top-actions">
@@ -1774,12 +1792,16 @@ export default function App() {
                   ? msg("财务总览")
                   : page === "settings" && settingsTab === "help"
                     ? msg("帮助与使用手册")
-                    : pages.find((p) => p.key === page)?.label}
+                    : page === "settings" && settingsTab === "bills"
+                      ? msg("固定账单")
+                      : pages.find((p) => p.key === page)?.label}
               </h1>
               <p>
                 {page === "settings" && settingsTab === "help"
                   ? msg("快速了解功能、计算口径和数据管理。")
-                  : headerSub[page]}
+                  : page === "settings" && settingsTab === "bills"
+                    ? headerSub.bills
+                    : headerSub[page]}
               </p>
             </div>
             <div className="heading-actions">
@@ -2154,12 +2176,7 @@ export default function App() {
                         <Plus size={15} />
                         {msg("新增账单")}
                       </button>
-                      <button
-                        onClick={() => {
-                          goto("settings");
-                          setSettingsTab("bills");
-                        }}
-                      >
+                      <button onClick={() => openSettingsTab("bills")}>
                         {msg("查看全部")}
                       </button>
                     </div>
@@ -2542,12 +2559,7 @@ export default function App() {
                 <span>
                   {msg("周期可在这里调整，历史交易不会静默重新分组。")}
                 </span>
-                <button
-                  onClick={() => {
-                    goto("settings");
-                    setSettingsTab("general");
-                  }}
-                >
+                <button onClick={() => openSettingsTab("general")}>
                   {msg("修改工资日")}
                 </button>
                 <button
@@ -3831,6 +3843,7 @@ export default function App() {
                     className={settingsTab === k ? "active" : ""}
                     key={k}
                     onClick={() => {
+                      sessionStorage.setItem("salaryflow.settingsTab", k);
                       setSettingsTab(k);
                       if (k === "data")
                         act(async () => setInfo(await api("dataInfo")));
@@ -4066,13 +4079,13 @@ export default function App() {
                   <div className="setting-row">
                     <div>
                       <h3>{msg("关于薪流")}</h3>
-                      <button onClick={() => setSettingsTab("help")}>
+                      <button onClick={() => openSettingsTab("help")}>
                         <CircleHelp size={16} />
                         {msg("帮助与使用手册")}
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.9.0 · Windows 与移动端本地个人预算、现金流和资产管理",
+                          "SalaryFlow 0.9.1 · Windows 与移动端本地个人预算、现金流和资产管理",
                         )}
                       </p>
                       <p>

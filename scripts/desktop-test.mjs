@@ -15,7 +15,7 @@ const app = await electron.launch({
     ? { executablePath: process.env.SALARYFLOW_PACKAGED_EXE, args: [] }
     : { args: ["."] }),
   env,
-  timeout: 60000,
+  timeout: process.env.SALARYFLOW_PACKAGED_EXE ? 180000 : 60000,
 });
 try {
   const page = await app.firstWindow();
@@ -121,6 +121,7 @@ try {
   for (const [name, file] of [
     ["交易记录", "03-transactions"],
     ["预算与周期", "04-budget"],
+    ["固定账单", "04-bills"],
     ["工资分配", "05-allocation"],
     ["我的账户", "06-accounts"],
     ["待收款", "06-receivables"],
@@ -147,6 +148,26 @@ try {
       await page.getByRole("button", { name: "应用筛选", exact: true }).click();
       assert.equal(await page.getByLabel("日期范围").inputValue(), "days3");
       await page.getByRole("button", { name: "清除范围", exact: true }).click();
+    }
+    if (name === "固定账单") {
+      await page
+        .locator(".page-heading")
+        .getByRole("heading", { name: "固定账单", exact: true })
+        .waitFor();
+      assert(
+        await page
+          .locator("nav")
+          .getByRole("button", { name: "固定账单", exact: true })
+          .evaluate((element) => element.classList.contains("selected")),
+        "固定账单一级入口没有保持选中状态",
+      );
+      assert(
+        await page
+          .locator(".settings-tabs")
+          .getByRole("button", { name: "固定账单", exact: true })
+          .evaluate((element) => element.classList.contains("active")),
+        "固定账单一级入口没有打开对应管理页",
+      );
     }
     if (name === "待收款") {
       await page
@@ -317,7 +338,10 @@ try {
         .click();
     }
   }
-  await page.getByRole("button", { name: "固定账单", exact: true }).click();
+  await page
+    .locator("nav")
+    .getByRole("button", { name: "固定账单", exact: true })
+    .click();
   await page.getByRole("button", { name: "新增账单" }).click();
   await page
     .getByRole("dialog")

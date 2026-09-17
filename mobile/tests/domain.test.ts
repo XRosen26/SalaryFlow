@@ -10,6 +10,7 @@ import {
 } from "../src/domain/dates";
 import {
   budgetTone,
+  hasPrimarySpendingAccount,
   parseMoneyExpression,
   spendablePresentation,
 } from "../src/domain/money";
@@ -73,6 +74,20 @@ test("工资分配允许零值保留金额，不在页面初次渲染时抛错",
   assert.throws(() => parseMoneyExpression("0"), /金额超出允许范围/);
 });
 
+test("主要消费账户按数据库实际角色识别", () => {
+  assert.equal(
+    hasPrimarySpendingAccount([{ roles: ["PRIMARY_SPENDING"] }]),
+    true,
+  );
+  assert.equal(hasPrimarySpendingAccount([{ roles: ["SPENDING"] }]), false);
+  assert.equal(
+    hasPrimarySpendingAccount([
+      { roles: ["PRIMARY_SALARY"] },
+      { roles: ["PRIMARY_SAVINGS"] },
+    ]),
+    false,
+  );
+});
 test("安心支出状态取预算比例和消费账户覆盖比例中较低的一项", () => {
   assert.equal(spendablePresentation(800000, 1000000, 1000000).key, "SAFE");
   assert.equal(spendablePresentation(800000, 1000000, 0).key, "NO_FUNDS");

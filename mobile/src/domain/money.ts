@@ -198,6 +198,11 @@ export function budgetTone(actual: number, budget: number): BudgetTone {
   if (ratio < 1.2) return { label: "超支", color: "#BB2F37" };
   return { label: "超支", color: "#861C2A" };
 }
+export function hasPrimarySpendingAccount(
+  accounts: readonly { roles: readonly string[] }[],
+) {
+  return accounts.some((account) => account.roles.includes("PRIMARY_SPENDING"));
+}
 export type SpendablePresentation = {
   key:
     | "NO_BUDGET"

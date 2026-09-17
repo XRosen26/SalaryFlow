@@ -24,7 +24,12 @@ import {
 import { radius, spacing, useAppTheme } from "@/constants/theme";
 import { useFinance } from "@/data/finance-context";
 import { addDays } from "@/domain/dates";
-import { budgetTone, formatMoney, spendablePresentation } from "@/domain/money";
+import {
+  budgetTone,
+  formatMoney,
+  hasPrimarySpendingAccount,
+  spendablePresentation,
+} from "@/domain/money";
 
 const kindLabel = {
   INCOME: "收入",
@@ -55,18 +60,43 @@ export default function HomeScreen() {
     remaining,
     snapshot.summary.budgetMinor,
     snapshot.summary.spendingBalanceMinor,
-    snapshot.accounts.some((account) => account.roles.includes("SPENDING")),
+    hasPrimarySpendingAccount(snapshot.accounts),
   );
   const safeAmount =
     safeState.key === "OVER_BUDGET" ? Math.abs(remaining) : safe;
   const topBudgets = snapshot.budgets.slice(0, width >= 700 ? 6 : 4);
   const recent = snapshot.transactions.slice(0, 5);
 
-  const explainSafe = () =>
-    Alert.alert(
-      safeState.label,
-      "预算未用完时，金额取“本期剩余预算”和“主要消费账户可用余额”中较小的非负值。卡片颜色与提醒取预算剩余比例和消费账户覆盖比例中较低的一项；预算是计划额度，账户余额是真实资金，转账只改变资金位置。",
-    );
+  const safeAction =
+    safeState.key === "NO_ACCOUNT"
+      ? { label: "设置主要消费账户", route: "/(tabs)/accounts" }
+      : safeState.key === "NO_BUDGET"
+        ? { label: "设置本期预算", route: "/(tabs)/budgets" }
+        : safeState.key === "NO_FUNDS"
+          ? { label: "查看消费账户", route: "/(tabs)/accounts" }
+          : null;
+
+  const explainSafe = () => {
+    const reason =
+      safeState.key === "NO_ACCOUNT"
+        ? "系统只识别未归档且主要角色为“主要消费”的账户。请在“账户”中打开一个账户，将“主要角色”设为“主要消费”，保存后首页会自动重新计算。"
+        : safeState.key === "NO_BUDGET"
+          ? "请先建立当前周期预算，首页才能比较计划额度和真实资金。"
+          : safeState.key === "NO_FUNDS"
+            ? "主要消费账户已设置，但当前可用余额为零或负数。请核对期初余额、漏记收入或尚未记录的转入。"
+            : "预算未用完时，金额取“本期剩余预算”和“主要消费账户可用余额”中较小的非负值。卡片颜色与提醒取预算剩余比例和消费账户覆盖比例中较低的一项。";
+    Alert.alert(safeState.label, `${safeState.hint}\n\n${reason}`, [
+      { text: "知道了", style: "cancel" },
+      ...(safeAction
+        ? [
+            {
+              text: safeAction.label,
+              onPress: () => router.push(safeAction.route as never),
+            },
+          ]
+        : []),
+    ]);
+  };
 
   const goAdd = (kind: "EXPENSE" | "INCOME" | "TRANSFER") => {
     router.push(`/add?kind=${kind}` as never);
@@ -147,7 +177,7 @@ export default function HomeScreen() {
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="解释当前可安心支出"
+            accessibilityLabel="解释预算与可用资金状态"
             onPress={explainSafe}
             hitSlop={10}
           >
@@ -155,6 +185,16 @@ export default function HomeScreen() {
           </Pressable>
         </View>
         <Text style={styles.heroHint}>{safeState.hint}</Text>
+        {safeAction ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={safeAction.label}
+            onPress={() => router.push(safeAction.route as never)}
+            style={styles.heroAction}
+          >
+            <Text style={styles.heroActionText}>{safeAction.label} →</Text>
+          </Pressable>
+        ) : null}
         <Divider />
         <View style={styles.heroFacts}>
           <View style={styles.heroFact}>
@@ -412,7 +452,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: spacing.sm,
   },
-  heroHint: { color: "#FFFFFF", opacity: 0.86, fontSize: 12 },
+  heroHint: { color: "#FFFFFF", opacity: 0.9, fontSize: 12, lineHeight: 18 },
+  heroAction: {
+    alignSelf: "flex-start",
+    minHeight: 36,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.55)",
+    borderRadius: 18,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroActionText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
   heroFacts: { flexDirection: "row", gap: spacing.xl },
   heroFact: { flex: 1, gap: spacing.xs },
   heroFactLabel: { color: "#FFFFFF", opacity: 0.82, fontSize: 12 },

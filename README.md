@@ -4,12 +4,12 @@
 
 ## 下载
 
-当前发布：**Windows 0.9.0 / Android 0.6.0 预览版**。
+当前发布：**Windows 0.9.1 / Android 0.6.1 预览版**。
 
-- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SalaryFlow-Setup-0.9.0-x64.exe)
-- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SalaryFlow-Portable-0.9.0-x64.exe)
-- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SalaryFlow-Android-0.6.0-preview-arm64-v8a.apk)
-- [SHA-256 校验清单](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.0/SHA256SUMS.txt)
+- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SalaryFlow-Setup-0.9.1-x64.exe)
+- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SalaryFlow-Portable-0.9.1-x64.exe)
+- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SalaryFlow-Android-0.6.1-preview-arm64-v8a.apk)
+- [SHA-256 校验清单](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SHA256SUMS.txt)
 
 Windows 安装包暂未使用公开代码签名证书，系统可能提示“未知发布者”。Android 包使用预览签名，支持 Android 7（API 24）及以上并按 API 36 构建，适合个人试用。iOS 共用源代码与配置已经建立；IPA 需要在 macOS/Xcode 环境完成原生构建与签名，本次不提供 iOS 安装包。
 
@@ -17,9 +17,9 @@ Windows 安装包暂未使用公开代码签名证书，系统可能提示“未
 
 | 平台      | 版本           | 状态                                                                           |
 | --------- | -------------- | ------------------------------------------------------------------------------ |
-| Windows   | 0.9.0          | 完整桌面端，适合预算规划、批量查看、统计、备份与长期维护                       |
-| Android   | 0.6.0 预览     | 触屏优先，突出快速记账、预算提醒、待收款和移动分析                             |
-| iOS       | 0.6.0 源码预览 | 共用 Expo/React Native 业务代码，配置与 iOS bundle 已验证，等待 macOS 真机构建 |
+| Windows   | 0.9.1          | 完整桌面端，适合预算规划、批量查看、统计、备份与长期维护                       |
+| Android   | 0.6.1 预览     | 触屏优先，突出快速记账、预算提醒、待收款和移动分析                             |
+| iOS       | 0.6.1 源码预览 | 共用 Expo/React Native 业务代码，配置与 iOS bundle 已验证，等待 macOS 真机构建 |
 | HarmonyOS | 规划中         | 待移动端基本体验稳定后再评估                                                   |
 
 各平台当前分别保存本地账本，不做多设备实时同步。完整 JSON 备份用于移动端迁移或恢复，属于整库替换，不会合并多台设备同时产生的记录。

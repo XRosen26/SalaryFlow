@@ -1,14 +1,14 @@
-# 验证记录 · Windows 0.9.0 / Android 0.6.0
+# 验证记录 · Windows 0.9.1 / Android 0.6.1
 
-## Windows 0.9.0 / Android 0.6.0 验收 · 2026-09-16
+## Windows 0.9.1 / Android 0.6.1 验收 · 2026-09-17
 
-Windows：62项Node财务、周期、迁移与可靠性测试全部通过，TypeScript/Vite生产构建通过；源码Electron和0.9.0最终解包程序均通过完整桌面流程。新增覆盖安心支出双约束、资金不足状态、分级阈值、ISO周及首次记账周期边界。高分屏辅助文字、表头、状态标签与说明文字已统一提高可读字号。Windows数据库schema保持6。
+Windows：62项Node财务、周期、迁移与可靠性测试全部通过，TypeScript/Vite生产构建通过；源码Electron和0.9.1最终解包程序均通过完整桌面流程。固定账单一级菜单的选中状态、面包屑与管理页面纳入实际交互验收。0.9.1便携版另以项目内隔离数据和临时目录启动，主进程及其Electron子进程正常创建后由测试主动关闭。Windows数据库schema保持6。
 
-Android：Expo SDK 57配置、TypeScript和10项领域测试通过；ARM64 Release完成576个Gradle任务，versionName 0.6.0、versionCode 7、minSdk 24、targetSdk 36。合并清单仅包含震动权限，不申请网络、旧外部存储或悬浮窗权限，系统云备份关闭。移动数据库schema保持4。中文简体启动器名为“薪流”，默认及英文为“SalaryFlow”。
+Android：Expo SDK 57配置、TypeScript和12项领域/数据库测试通过；ARM64 Release完成576个Gradle任务并通过Lint Vital、资源优化与打包，versionName 0.6.1、versionCode 8、minSdk 24、target/compileSdk 36。回归测试覆盖主要消费账户角色识别，以及固定账单修改/删除时保留已支付历史。移动数据库schema保持4。
 
-iOS：同一0.6.0 Expo工程重新导出HBC bundle成功，共1389个模块，buildNumber 7、Bundle ID com.xrosen26.salaryflow。Windows不能执行Xcode原生编译和签名，因此本次仍不提供IPA；项目保留EAS云构建与macOS/Xcode发布说明。
+iOS：同一0.6.1 Expo工程重新导出HBC bundle成功，共1389个模块，buildNumber 8、Bundle ID com.xrosen26.salaryflow。Windows不能执行Xcode原生编译和签名，因此本次仍不提供IPA；项目保留EAS云构建与macOS/Xcode发布说明。
 
-发布安全：Windows ASAR共4059个条目，Android APK共1235个条目；两份清单与Git跟踪清单均未发现SQLite账本、数据库、备份或用户数据。Windows安装版和便携版Authenticode状态均为NotSigned。发布物SHA-256：安装版 D9CF7C78D5AEF6371C6C679B75620F2F9A43672CE6F90AE6FA1A3042B99F30D1；便携版 A503C08D71085B0F3FF5444500835A09425521D619154F3016FBC026A0B40FC9；Android APK E68E9A25729E864B1588A04B56670DF73DCC720E1B54CCDF09D73CE6AAA461AE。本轮未连接真实Android/iOS设备，厂商系统、键盘、大字体和系统级提醒仍需持续真机试用。
+发布安全：Windows ASAR共4059个条目，Android APK共1235个条目；两份包内清单与Git跟踪清单均未发现SQLite账本、数据库、备份或用户数据。Windows安装版和便携版Authenticode状态均为NotSigned。发布物SHA-256：安装版 A0B4F970DE6E5A9169B50FDC1F5F38A74AF1AEA6484BC0C4FC8A00FF1B753C66；便携版 14BE32D8F0B035D66DB743E2160E4E9C57B15B43F102295869C9A41401ED2A8E；Android APK 6164C9F3D4705B9B8861883C881D5881407E67423BC996E7AD401AEA180CF521。本轮未连接真实Android/iOS设备，厂商系统、键盘、大字体和系统级提醒仍需持续真机试用。
 
 ## Windows 0.8.1 / Android 0.5.1 验收 · 2026-09-14
 
