@@ -1,4 +1,4 @@
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 
 export const schemaSql = `
 PRAGMA journal_mode = WAL;
@@ -149,8 +149,10 @@ CREATE TABLE IF NOT EXISTS bills (
   day INTEGER NOT NULL,
   start_date TEXT NOT NULL,
   enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN(0,1)),
-  revision INTEGER NOT NULL DEFAULT 1
+  revision INTEGER NOT NULL DEFAULT 1,
+  deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1))
 ) STRICT;
+CREATE INDEX IF NOT EXISTS bill_active_name ON bills(deleted,name);
 
 CREATE TABLE IF NOT EXISTS bill_occurrences (
   id TEXT PRIMARY KEY,

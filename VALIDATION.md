@@ -1,4 +1,14 @@
-# 验证记录 · Windows 0.9.1 / Android 0.6.1
+# 验证记录 · Windows 0.9.2 / Android 0.6.2
+
+## Windows 0.9.2 / Android 0.6.2 验收 · 2026-09-19
+
+Windows：64项Node财务、周期、迁移与可靠性测试全部通过，TypeScript/Vite生产构建、源码Electron和0.9.2最终解包程序均通过完整桌面流程。桌面验收确认固定账单删除入口可见，统计周/月/年选中态可读，帮助示例由隔离测试账本真实主内容区生成；便携版也在项目内隔离数据和临时目录启动成功。PC数据库升级至schema 7。
+
+Android：12项领域/数据库测试与TypeScript检查通过；ARM64 Release完成576个Gradle任务并通过Lint Vital、资源优化与打包。APK确认versionName 0.6.2、versionCode 9、minSdk 24、target/compileSdk 36，仅含arm64-v8a；简体中文启动器名为“薪流”，英文为“SalaryFlow”；只申请震动及应用内部接收器权限，不含网络、旧外部存储或悬浮窗权限。移动数据库升级至schema 4。
+
+iOS：共用Expo工程版本0.6.2、buildNumber 9重新导出HBC bundle成功，共1389个模块；Windows环境不能执行Xcode原生编译和签名，因此本次不提供IPA。
+
+发布安全：Windows ASAR共4059个条目，Android APK包内扫描均未发现SQLite账本、数据库、备份或用户数据。Windows安装版和便携版Authenticode状态均为NotSigned。发布物SHA-256：安装版 `42271FBE44F6393B2A88BDD2E9D19D97CB2AFD4537869524EEC65A7CCFBE89E5`；便携版 `3076CCA66464A9593152A7B6C0A929F5962510936E4EEF4F1E5526ADF3DF341D`；Android APK `1D95450108E7BDA8B69E2D2FE55CCCBB133A4E3630D3D071B16A7376FC09BAE5`。本轮未连接真实Android/iOS设备，厂商系统、键盘、大字体和系统级提醒仍需持续真机试用。
 
 ## Windows 0.9.1 / Android 0.6.1 验收 · 2026-09-17
 

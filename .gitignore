@@ -18,3 +18,7 @@ location.json
 SalaryFlow-data/
 .cache/
 mobile/dist-ios/
+
+.g/
+.electron-builder-cache/
+.local-temp/

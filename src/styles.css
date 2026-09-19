@@ -3502,9 +3502,27 @@ th {
   font-weight: 750;
 }
 .calendar-unit-buttons button.active {
-  background: var(--primary);
+  background: var(--accent);
   color: #fff;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 22%, transparent);
+  -webkit-text-fill-color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+[data-theme="dark"] .calendar-unit-buttons button.active {
+  color: #12261d;
+  -webkit-text-fill-color: #12261d;
+}
+.receivable-person-cell {
+  min-width: 230px;
+}
+.receivable-person-cell strong,
+.receivable-person-cell small {
+  display: block;
+}
+.receivable-person-cell small {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 .calendar-quick > select {
   min-width: 250px;

@@ -194,6 +194,7 @@ export class Store {
       "setDefaults",
       "saveCategory",
       "archiveCategory",
+      "deleteCategory",
       "record",
       "edit",
       "deleteTransaction",
@@ -209,6 +210,7 @@ export class Store {
       "saveSettings",
       "saveBill",
       "toggleBill",
+      "deleteBill",
       "processBill",
       "saveAllocation",
       "confirmAllocation",
@@ -688,7 +690,10 @@ export class Store {
     const c = this.one("SELECT * FROM categories WHERE id=?", p.id);
     ensure(c && c.revision === p.revision, "分类已更新");
     ensure(
-      !this.one("SELECT id FROM bills WHERE category_id=? AND enabled=1", p.id),
+      !this.one(
+        "SELECT id FROM bills WHERE category_id=? AND enabled=1 AND deleted=0",
+        p.id,
+      ),
       "请先停用相关固定账单",
     );
     this.run(
@@ -702,6 +707,29 @@ export class Store {
       c,
       this.one("SELECT * FROM categories WHERE id=?", p.id),
     );
+  }
+  deleteCategory(p) {
+    const c = this.one("SELECT * FROM categories WHERE id=?", p.id);
+    ensure(c && c.revision === p.revision, "分类已更新");
+    const usedByTransaction = this.one(
+      "SELECT t.id FROM transactions t JOIN category_versions v ON v.id=t.category_version_id WHERE v.category_id=? LIMIT 1",
+      p.id,
+    );
+    const usedByBudget = this.one(
+      "SELECT b.id FROM budget_versions b, json_each(b.items) j WHERE json_extract(j.value,'$.category_id')=? LIMIT 1",
+      p.id,
+    );
+    const usedByBill = this.one(
+      "SELECT id FROM bills WHERE category_id=? LIMIT 1",
+      p.id,
+    );
+    ensure(
+      !usedByTransaction && !usedByBudget && !usedByBill,
+      "该分类已有交易、预算或固定账单记录，不能彻底删除；请使用归档",
+    );
+    this.audit("category", p.id, c, null, "彻底删除未使用分类");
+    this.run("DELETE FROM category_versions WHERE category_id=?", p.id);
+    this.run("DELETE FROM categories WHERE id=?", p.id);
   }
   categories() {
     return this.all(
@@ -1968,11 +1996,13 @@ export class Store {
       total,
       page,
       defaultBudget: this.latestBudget("DEFAULT"),
-      bills: this.all("SELECT * FROM bills ORDER BY name").map((b) => ({
-        ...b,
-        next_due: b.enabled ? this.nextBillDate(b) : null,
-        amount_minor: String(b.amount_minor),
-      })),
+      bills: this.all("SELECT * FROM bills WHERE deleted=0 ORDER BY name").map(
+        (b) => ({
+          ...b,
+          next_due: b.enabled ? this.nextBillDate(b) : null,
+          amount_minor: String(b.amount_minor),
+        }),
+      ),
       occurrences: this.all(
         "SELECT * FROM bill_occurrences WHERE status='PENDING' ORDER BY COALESCE(snoozed_to,due_date) LIMIT 100",
       ).map((b) => ({ ...b, amount_minor: String(b.amount_minor) })),
@@ -2206,7 +2236,9 @@ export class Store {
     return { id: row.id, transactions: transactionIds.length };
   }
   saveBill(p) {
-    const old = p.id ? this.one("SELECT * FROM bills WHERE id=?", p.id) : null;
+    const old = p.id
+      ? this.one("SELECT * FROM bills WHERE id=? AND deleted=0", p.id)
+      : null;
     if (p.id) ensure(old?.revision === p.revision, "账单已更新");
     this.account(p.account_id);
     ensure(
@@ -2256,7 +2288,7 @@ export class Store {
     this.materializeBills();
   }
   toggleBill(p) {
-    const b = this.one("SELECT * FROM bills WHERE id=?", p.id);
+    const b = this.one("SELECT * FROM bills WHERE id=? AND deleted=0", p.id);
     ensure(b?.revision === p.revision, "账单已更新");
     this.run(
       "UPDATE bills SET enabled=?,revision=revision+1 WHERE id=?",
@@ -2268,6 +2300,25 @@ export class Store {
       b.id,
       b,
       this.one("SELECT * FROM bills WHERE id=?", b.id),
+    );
+  }
+  deleteBill(p) {
+    const b = this.one("SELECT * FROM bills WHERE id=? AND deleted=0", p.id);
+    ensure(b?.revision === p.revision, "账单已更新或删除");
+    this.run(
+      "UPDATE bills SET enabled=0,deleted=1,revision=revision+1 WHERE id=?",
+      b.id,
+    );
+    this.run(
+      "UPDATE bill_occurrences SET status='SKIPPED' WHERE bill_id=? AND status='PENDING'",
+      b.id,
+    );
+    this.audit(
+      "bill",
+      b.id,
+      b,
+      this.one("SELECT * FROM bills WHERE id=?", b.id),
+      "删除固定账单规则",
     );
   }
   nextBillDate(b) {
@@ -2285,7 +2336,9 @@ export class Store {
     return null;
   }
   materializeBills() {
-    for (const b of this.all("SELECT * FROM bills WHERE enabled=1")) {
+    for (const b of this.all(
+      "SELECT * FROM bills WHERE enabled=1 AND deleted=0",
+    )) {
       const last = this.one(
         "SELECT MAX(due_date) d FROM bill_occurrences WHERE bill_id=?",
         b.id,

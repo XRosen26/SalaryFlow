@@ -33,6 +33,11 @@ test("Android SQLite 初始 schema 可以一次建成并启用核心约束", () 
     .all()
     .map((row) => (row as { name: string }).name);
   assert.ok(receivableColumns.includes("deleted"));
+  const billColumns = db
+    .prepare("PRAGMA table_info(bills)")
+    .all()
+    .map((row) => (row as { name: string }).name);
+  assert.ok(billColumns.includes("deleted"));
   assert.throws(
     () =>
       db.exec(
@@ -88,17 +93,16 @@ test("固定账单规则修改只更新未确认待办，删除规则保留历�
 
   db.exec(
     [
-      "UPDATE bills SET enabled=0,revision=revision+1 WHERE id='b1' AND enabled=1 AND revision=2;",
+      "UPDATE bills SET enabled=0,deleted=1,revision=revision+1 WHERE id='b1' AND enabled=1 AND revision=2;",
       "UPDATE bill_occurrences SET status='SKIPPED' WHERE bill_id='b1' AND status='PENDING';",
     ].join("\n"),
   );
-  assert.equal(
-    (
-      db.prepare("SELECT enabled FROM bills WHERE id='b1'").get() as {
-        enabled: number;
-      }
-    ).enabled,
-    0,
+  assert.deepEqual(
+    Object.assign(
+      {},
+      db.prepare("SELECT enabled,deleted FROM bills WHERE id='b1'").get(),
+    ),
+    { enabled: 0, deleted: 1 },
   );
   assert.equal(
     (

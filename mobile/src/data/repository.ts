@@ -346,6 +346,25 @@ export async function initializeDatabase(db: SQLiteDatabase) {
       isoNow(),
     );
     await db.execAsync("PRAGMA user_version = 3");
+    currentVersion = 3;
+  }
+  if (currentVersion < 4) {
+    const billColumns = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(bills)",
+    );
+    if (!billColumns.some((column) => column.name === "deleted"))
+      await db.execAsync(
+        "ALTER TABLE bills ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1));",
+      );
+    await db.execAsync(
+      "CREATE INDEX IF NOT EXISTS bill_active_name ON bills(deleted,name);",
+    );
+    await db.runAsync(
+      "INSERT OR IGNORE INTO schema_migrations(version,checksum,applied_at) VALUES(4,?,?)",
+      "mobile-bill-soft-delete-v4",
+      isoNow(),
+    );
+    await db.execAsync("PRAGMA user_version = 4");
   }
   await seed(db);
   await ensureCycleForDate(db, today());
@@ -1144,10 +1163,67 @@ export async function archiveCategory(db: SQLiteDatabase, categoryId: string) {
     categoryId,
   );
   if (!category) throw new Error("分类不存在");
+  const activeBill = await db.getFirstAsync<{ id: string }>(
+    "SELECT id FROM bills WHERE category_id=? AND enabled=1 AND deleted=0 LIMIT 1",
+    categoryId,
+  );
+  if (activeBill) throw new Error("请先删除使用该分类的固定账单，再归档分类。");
   await db.runAsync(
     "UPDATE categories SET archived=1,revision=revision+1 WHERE id=?",
     categoryId,
   );
+}
+export async function deleteCategory(db: SQLiteDatabase, categoryId: string) {
+  const category = await db.getFirstAsync<{ id: string; kind: string }>(
+    "SELECT id,kind FROM categories WHERE id=?",
+    categoryId,
+  );
+  if (!category) throw new Error("分类不存在或已删除");
+  const transaction = await db.getFirstAsync<{ id: string }>(
+    "SELECT x.id FROM transactions x JOIN category_versions v ON v.id=x.category_version_id WHERE v.category_id=? LIMIT 1",
+    categoryId,
+  );
+  const budget = await db.getFirstAsync<{ id: string }>(
+    "SELECT b.id FROM budget_versions b,json_each(b.items) j WHERE json_extract(j.value,'$.categoryId')=? OR json_extract(j.value,'$.category_id')=? LIMIT 1",
+    categoryId,
+    categoryId,
+  );
+  const bill = await db.getFirstAsync<{ id: string }>(
+    "SELECT id FROM bills WHERE category_id=? LIMIT 1",
+    categoryId,
+  );
+  if (transaction || budget || bill)
+    throw new Error(
+      "该分类已有交易、预算或固定账单记录，不能彻底删除；请使用归档。",
+    );
+  const operationId = id("op"),
+    now = isoNow();
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync(
+      "INSERT INTO operations(id,hash,action,result,created_at) VALUES(?,?,?,?,?)",
+      operationId,
+      operationId,
+      "DELETE_CATEGORY",
+      "{}",
+      now,
+    );
+    await tx.runAsync(
+      "INSERT INTO audit(id,operation_id,entity,entity_id,before_data,after_data,reason,created_at) VALUES(?,?,?,?,?,?,?,?)",
+      id("audit"),
+      operationId,
+      "categories",
+      categoryId,
+      JSON.stringify(category),
+      null,
+      "彻底删除未使用分类",
+      now,
+    );
+    await tx.runAsync(
+      "DELETE FROM category_versions WHERE category_id=?",
+      categoryId,
+    );
+    await tx.runAsync("DELETE FROM categories WHERE id=?", categoryId);
+  });
 }
 export async function saveCycleBudget(
   db: SQLiteDatabase,
@@ -1686,7 +1762,7 @@ export async function loadBillRules(
       "JOIN accounts a ON a.id=b.account_id " +
       "JOIN category_versions cv ON cv.category_id=b.category_id " +
       "AND cv.version=(SELECT MAX(v.version) FROM category_versions v WHERE v.category_id=b.category_id) " +
-      "WHERE b.enabled=1 ORDER BY b.name,b.id",
+      "WHERE b.enabled=1 AND b.deleted=0 ORDER BY b.name,b.id",
   );
 }
 
@@ -1717,7 +1793,7 @@ export async function saveBill(db: SQLiteDatabase, input: BillInput) {
       const changed = await tx.runAsync(
         "UPDATE bills SET name=?,amount_minor=?,account_id=?,category_id=?," +
           "frequency=?,day=?,enabled=1,revision=revision+1 " +
-          "WHERE id=? AND enabled=1 AND revision=?",
+          "WHERE id=? AND enabled=1 AND deleted=0 AND revision=?",
         name,
         input.amountMinor,
         input.accountId,
@@ -1788,7 +1864,7 @@ export async function disableBill(
 ) {
   await db.withExclusiveTransactionAsync(async (tx) => {
     const changed = await tx.runAsync(
-      "UPDATE bills SET enabled=0,revision=revision+1 WHERE id=? AND enabled=1 AND revision=?",
+      "UPDATE bills SET enabled=0,deleted=1,revision=revision+1 WHERE id=? AND enabled=1 AND deleted=0 AND revision=?",
       billId,
       revision,
     );
@@ -1813,7 +1889,7 @@ export async function loadPendingBills(
     frequency: "MONTHLY" | "WEEKLY";
     day: number;
   }>(
-    "SELECT id,name,amount_minor,account_id,category_id,frequency,day FROM bills WHERE enabled=1",
+    "SELECT id,name,amount_minor,account_id,category_id,frequency,day FROM bills WHERE enabled=1 AND deleted=0",
   );
   for (const bill of bills) {
     const pending = await db.getFirstAsync<{ id: string }>(

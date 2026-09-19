@@ -96,6 +96,15 @@ try {
     category_id: transit.id,
     note: "通勤与周末出行",
   });
+  await cmd("saveBill", {
+    name: "桌面测试订阅",
+    amount_minor: "3600",
+    account_id: spending.id,
+    category_id: food.id,
+    frequency: "MONTHLY",
+    day: 25,
+    start_date: today,
+  });
   await page.reload();
   await page.getByRole("heading", { name: "财务总览", exact: true }).waitFor();
   if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
@@ -136,6 +145,12 @@ try {
     await page.waitForTimeout(150);
     if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
       await page.screenshot({ path: path.join(result, file + ".png") });
+    if (name === "统计分析" && process.env.SALARYFLOW_UPDATE_MANUAL) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.locator("main .content").screenshot({
+        path: path.resolve("src/assets/manual-analysis.png"),
+      });
+    }
     if (name === "交易记录") {
       await page.getByLabel("交易排序").selectOption("amount_desc");
       assert.equal(
@@ -161,6 +176,12 @@ try {
           .evaluate((element) => element.classList.contains("selected")),
         "固定账单一级入口没有保持选中状态",
       );
+      const billRule = page.locator(".setting-row", {
+        hasText: "桌面测试订阅",
+      });
+      await billRule
+        .getByRole("button", { name: "删除", exact: true })
+        .waitFor();
       assert(
         await page
           .locator(".settings-tabs")
@@ -200,6 +221,17 @@ try {
       );
     }
     if (name === "统计分析") {
+      const activeUnitButton = page.locator(
+        ".calendar-unit-buttons button.active",
+      );
+      const unitAppearance = await activeUnitButton.evaluate((element) => ({
+        color: getComputedStyle(element).color,
+        fill: getComputedStyle(element).webkitTextFillColor,
+        text: element.textContent?.trim(),
+      }));
+      assert.match(unitAppearance.text || "", /周|月|年/, "快捷按钮文字丢失");
+      assert.notEqual(unitAppearance.color, "rgba(0, 0, 0, 0)");
+      assert.notEqual(unitAppearance.fill, "rgba(0, 0, 0, 0)");
       const periodSelect = page.getByLabel("选择具体日历周期");
       assert(
         (await periodSelect.locator("option").count()) > 1,

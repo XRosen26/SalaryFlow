@@ -5,13 +5,13 @@
 - `ledgerStartDate` 是快照派生字段，取未删除交易的最早 `transaction_date` 与未删除账户的最早 `start_date` 中较早者；不建立重复交易或统计周期表。
 - 周期选择器在表现层按本地日历生成半开区间 `[start,end)`；自然周以周一开始并使用ISO周年，月和年按自然边界。截止日期在界面显示为 `end-1 day`。
 - “安心支出”金额沿用整数分的 `max(0,min(remainingBudget,spendingBalance))`。颜色使用只读派生比例，不参与余额、预算或交易计算；缺少预算/账户和零值使用显式状态，避免除零或错误绿色。
-- 本次只增加快照派生字段、界面状态和日期选择逻辑，不改变表结构，PC schema 6与移动schema 4保持不变。
+- PC schema 7 和移动 schema 4 为固定账单增加软删除标记：删除规则会取消未确认待办，已支付实例与真实交易继续保留。分类彻底删除仅允许从未被交易、预算或账单引用的记录，其他分类使用归档。
 
 ## 0.8.1实现补充
 
 数据库schema 5新增`receivables`与`receivable_repayments`。每次借出/归还与一条`ADJUSTMENT`资金记录一一关联，在同一SQLite事务内写入；schema 6为待收款增加软删除标记，撤销时原子软删除全部关联资金记录并保留审计；报表只聚合INCOME/EXPENSE/REFUND，因此不会污染收支。金额仍为整数分，余额不足、超额归还、日期和revision均在提交前校验。
 
-移动schema 3采用相同两表、资金口径与待收款软删除机制。Android/iOS共用Expo SDK 57工程、SQLite仓储和页面代码；iOS使用固定Bundle ID `com.xrosen26.salaryflow`，当前Windows环境完成bundle导出，原生签名留给macOS/Xcode。
+移动schema 3采用相同两表、资金口径与待收款软删除机制；schema 4增加固定账单软删除。Android/iOS共用Expo SDK 57工程、SQLite仓储和页面代码；iOS使用固定Bundle ID `com.xrosen26.salaryflow`，当前Windows环境完成bundle导出，原生签名留给macOS/Xcode。
 
 0.5增量：settings JSON增加amount_visibility，包含master、overview三卡和动态account id映射，兼容旧hide_amounts；显示判定不参与金额计算。setPayday以IMMEDIATE/NEXT_WEEK显式模式更新开放周期和cycle_rules，事务内验证交易范围及结算快照。resetLedger在主进程原生二次确认后关闭SQLite，限定路径删除主库/WAL/SHM和可选的SalaryFlow命名备份，再创建空账本并重载；schema保持3。
 

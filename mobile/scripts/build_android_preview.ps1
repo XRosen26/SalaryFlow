@@ -1,4 +1,4 @@
-param(
+﻿param(
   [ValidateSet('Debug','Release')]
   [string]$Configuration = 'Release',
   [ValidateSet('arm64-v8a','x86_64')]
@@ -13,14 +13,18 @@ $appVersion = (Get-Content -Raw -LiteralPath (Join-Path $mobileRoot 'package.jso
 Push-Location $mobileRoot
 try {
   $env:NODE_ENV = 'production'
-  $env:GRADLE_USER_HOME = Join-Path $mobileRoot '.g'
+  $env:GRADLE_USER_HOME = Join-Path ((Resolve-Path -LiteralPath (Join-Path $mobileRoot '..')).Path) '.g'
   $env:TEMP = Join-Path $mobileRoot '.local-temp'
   $env:TMP = $env:TEMP
   New-Item -ItemType Directory -Path $env:GRADLE_USER_HOME, $env:TEMP -Force | Out-Null
   & npx.cmd expo prebuild --platform android --clean --no-install
   if ($LASTEXITCODE -ne 0) { throw 'Expo Android 预构建失败' }
   $wrapperProperties = Join-Path $androidRoot 'gradle\wrapper\gradle-wrapper.properties'
-  if ((Get-Content -Raw -LiteralPath $wrapperProperties) -notmatch '(?m)^networkTimeout=') {
+  $wrapperContent = Get-Content -Raw -LiteralPath $wrapperProperties
+  if ($wrapperContent -match '(?m)^networkTimeout=') {
+    $wrapperContent = $wrapperContent -replace '(?m)^networkTimeout=.*$', 'networkTimeout=600000'
+    Set-Content -LiteralPath $wrapperProperties -Value $wrapperContent -Encoding ascii
+  } else {
     Add-Content -LiteralPath $wrapperProperties -Value 'networkTimeout=600000' -Encoding ascii
   }
 

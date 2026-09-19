@@ -280,3 +280,61 @@ test("结算锁和重新打开，旧快照保留", (t) => {
     1,
   );
 });
+
+test("固定账单规则可删除且取消待办", (t) => {
+  const { store, spending, food } = fixture(t);
+  store.command("saveBill", {
+    name: "会员",
+    amount_minor: "1000",
+    account_id: spending.id,
+    category_id: food.id,
+    frequency: "MONTHLY",
+    day: 20,
+    start_date: "2026-09-01",
+  });
+  const rule = store.snapshot().bills.find((b) => b.name === "会员");
+  store.command("deleteBill", { id: rule.id, revision: rule.revision });
+  assert.equal(
+    store.snapshot().bills.some((b) => b.id === rule.id),
+    false,
+  );
+  const stored = store.one(
+    "SELECT deleted,enabled FROM bills WHERE id=?",
+    rule.id,
+  );
+  assert.deepEqual(Object.assign({}, stored), { deleted: 1, enabled: 0 });
+  assert.equal(
+    store.one(
+      "SELECT status FROM bill_occurrences WHERE bill_id=? ORDER BY due_date LIMIT 1",
+      rule.id,
+    ).status,
+    "SKIPPED",
+  );
+});
+
+test("未使用分类可删除，已有预算的分类只能归档", (t) => {
+  const { store, food } = fixture(t);
+  const unused = store.command("saveCategory", {
+    kind: "EXPENSE",
+    name: "临时分类",
+    group: "其他",
+  });
+  const row = store.one("SELECT * FROM categories WHERE id=?", unused.id);
+  store.command("deleteCategory", { id: unused.id, revision: row.revision });
+  assert.equal(
+    store.one("SELECT id FROM categories WHERE id=?", unused.id),
+    undefined,
+  );
+  const budgetCategory = store.one(
+    "SELECT * FROM categories WHERE id=?",
+    food.id,
+  );
+  assert.throws(
+    () =>
+      store.command("deleteCategory", {
+        id: food.id,
+        revision: budgetCategory.revision,
+      }),
+    /不能彻底删除/,
+  );
+});

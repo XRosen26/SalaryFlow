@@ -4,12 +4,12 @@
 
 ## 下载
 
-当前发布：**Windows 0.9.1 / Android 0.6.1 预览版**。
+当前发布：**Windows 0.9.2 / Android 0.6.2 预览版**。
 
-- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SalaryFlow-Setup-0.9.1-x64.exe)
-- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SalaryFlow-Portable-0.9.1-x64.exe)
-- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SalaryFlow-Android-0.6.1-preview-arm64-v8a.apk)
-- [SHA-256 校验清单](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.1/SHA256SUMS.txt)
+- [Windows 安装版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.2/SalaryFlow-Setup-0.9.2-x64.exe)
+- [Windows 便携版 x64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.2/SalaryFlow-Portable-0.9.2-x64.exe)
+- [Android APK ARM64](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.2/SalaryFlow-Android-0.6.2-preview-arm64-v8a.apk)
+- [SHA-256 校验清单](https://github.com/XRosen26/SalaryFlow/releases/download/v0.9.2/SHA256SUMS.txt)
 
 Windows 安装包暂未使用公开代码签名证书，系统可能提示“未知发布者”。Android 包使用预览签名，支持 Android 7（API 24）及以上并按 API 36 构建，适合个人试用。iOS 共用源代码与配置已经建立；IPA 需要在 macOS/Xcode 环境完成原生构建与签名，本次不提供 iOS 安装包。
 
@@ -17,9 +17,9 @@ Windows 安装包暂未使用公开代码签名证书，系统可能提示“未
 
 | 平台      | 版本           | 状态                                                                           |
 | --------- | -------------- | ------------------------------------------------------------------------------ |
-| Windows   | 0.9.1          | 完整桌面端，适合预算规划、批量查看、统计、备份与长期维护                       |
-| Android   | 0.6.1 预览     | 触屏优先，突出快速记账、预算提醒、待收款和移动分析                             |
-| iOS       | 0.6.1 源码预览 | 共用 Expo/React Native 业务代码，配置与 iOS bundle 已验证，等待 macOS 真机构建 |
+| Windows   | 0.9.2          | 完整桌面端，适合预算规划、批量查看、统计、备份与长期维护                       |
+| Android   | 0.6.2 预览     | 触屏优先，突出快速记账、预算提醒、待收款和移动分析                             |
+| iOS       | 0.6.2 源码预览 | 共用 Expo/React Native 业务代码，配置与 iOS bundle 已验证，等待 macOS 真机构建 |
 | HarmonyOS | 规划中         | 待移动端基本体验稳定后再评估                                                   |
 
 各平台当前分别保存本地账本，不做多设备实时同步。完整 JSON 备份用于移动端迁移或恢复，属于整库替换，不会合并多台设备同时产生的记录。
@@ -30,16 +30,16 @@ Windows 安装包暂未使用公开代码签名证书，系统可能提示“未
 
 ## 主要功能
 
-- 收入、支出、转账、关联退款、固定账单、工资分配和待收款分次归还
+- 收入、支出、转账、关联退款、可修改/删除的固定账单、工资分配和待收款分次归还
 - 工资周期或自然月预算；周期规则可立即、下周期或指定日期生效
-- 动态账户、理财估值、余额校准，以及全局与卡片/账户双层金额隐藏
+- 动态账户与分类；未使用分类可删除、有历史分类可归档；支持理财估值、余额校准和双层金额隐藏
 - 统计支持今日、最近3/7/30/90天、工资周期、自定义区间，以及从首次记账日期生成的周/月/年快捷历史周期
 - 周期预算、收入/支出、收支规模、账户资产与分类层级可视化；图表随六套配色和明暗主题协调变化
 - 交易可按类型、账户、分类、日期、金额范围和多种顺序筛选
 - 金额输入支持 `+ - * / ( )`，最终按整数“分”保存，避免浮点误差
 - JSON 完整备份与恢复、CSV/JSON/Markdown 导出、重复导入识别和安全重置账本
 - 移动记账采用“类型 → 分类弹层 → 金额 → 账户 → 日期”，日期支持日历与常见中文/数字输入
-- Windows 侧栏和移动首页均有使用说明入口；移动端支持六套配色与系统/浅色/深色模式
+- Windows 侧栏和移动首页均有使用说明入口；帮助示例来自隔离测试账本的真实页面；移动端支持六套配色与系统/浅色/深色模式
 
 ## 财务口径
 

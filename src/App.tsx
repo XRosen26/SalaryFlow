@@ -2981,9 +2981,11 @@ export default function App() {
                               key={row.id}
                               className={`receivable-due ${due.key}`}
                             >
-                              <td>
+                              <td className="receivable-person-cell">
                                 <strong>{row.person}</strong>
-                                <small>{row.note || msg("无备注")}</small>
+                                <small>
+                                  {msg("备注")}：{row.note || msg("无备注")}
+                                </small>
                               </td>
                               <td>{row.source_account_name}</td>
                               <td className="mono">
@@ -4085,7 +4087,7 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.9.1 · Windows 与移动端本地个人预算、现金流和资产管理",
+                          "SalaryFlow 0.9.2 · Windows 与移动端本地个人预算、现金流和资产管理",
                         )}
                       </p>
                       <p>
@@ -4104,7 +4106,11 @@ export default function App() {
                   <div className="panel-heading">
                     <div>
                       <h3>{msg("收支分类")}</h3>
-                      <p>{msg("名称、分组可修改；历史版本始终保留")}</p>
+                      <p>
+                        {msg(
+                          "名称、分组可修改；未使用分类可删除，有历史分类可归档",
+                        )}
+                      </p>
                     </div>
                     <button className="primary" onClick={() => categoryForm()}>
                       <Plus size={16} />
@@ -4159,6 +4165,26 @@ export default function App() {
                               }
                             >
                               {c.archived ? msg("恢复") : msg("归档")}
+                            </button>
+                            <button
+                              className="danger"
+                              onClick={() =>
+                                confirm(
+                                  msg("删除分类"),
+                                  msg(
+                                    "仅未被任何交易、预算或固定账单使用的分类可以彻底删除；已有历史的分类请使用归档。",
+                                  ),
+                                  async (_, op) =>
+                                    mutate(
+                                      "deleteCategory",
+                                      { id: c.id, revision: c.revision },
+                                      op,
+                                    ),
+                                )
+                              }
+                            >
+                              <Trash2 size={14} />
+                              {msg("删除")}
                             </button>
                           </td>
                         </tr>
@@ -4328,6 +4354,26 @@ export default function App() {
                             }
                           >
                             {b.enabled ? msg("停用") : msg("启用")}
+                          </button>
+                          <button
+                            className="danger"
+                            onClick={() =>
+                              confirm(
+                                msg("删除固定账单"),
+                                msg(
+                                  "删除后停止后续提醒，并取消当前未确认待办；已支付历史和真实交易继续保留。",
+                                ),
+                                async (_, op) =>
+                                  mutate(
+                                    "deleteBill",
+                                    { id: b.id, revision: b.revision },
+                                    op,
+                                  ),
+                              )
+                            }
+                          >
+                            <Trash2 size={14} />
+                            {msg("删除")}
                           </button>
                         </div>
                       </div>
