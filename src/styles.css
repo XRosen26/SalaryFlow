@@ -3582,3 +3582,20 @@ th {
     min-width: 210px;
   }
 }
+
+.refund-status { color: var(--income); font-weight: 800; display: block; margin-top: 3px; }
+.savings-plan-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap: 18px; }
+.savings-plan-card { display: flex; flex-direction: column; gap: 16px; }
+.savings-plan-head,.savings-figures { display: flex; justify-content: space-between; gap: 16px; }
+.savings-plan-head h3 { margin: 0 0 5px; }
+.savings-plan-head > strong { color: var(--primary); font-size: 22px; }
+.savings-progress { height: 10px; border-radius: 999px; background: var(--surface-muted); overflow: hidden; }
+.savings-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.savings-figures > div { display: flex; flex-direction: column; gap: 4px; }
+.savings-figures small { color: var(--text-secondary); }
+.savings-figures b { font-size: 17px; }
+
+.allocation-warning { padding: 16px; border-radius: 14px; background: var(--primary-soft); border: 1px solid var(--border); display: grid; gap: 10px; }
+.allocation-warning p { margin: 0; color: var(--text-secondary); }
+.custom-topup { display: flex; gap: 8px; max-width: 420px; }
+.custom-topup input { flex: 1; min-width: 0; }

@@ -53,5 +53,14 @@ ALTER TABLE bills ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN
 CREATE INDEX bill_active_name ON bills(deleted,name);
 `,
   },
+  {
+    version: 8,
+    name: "存钱计划",
+    sql: `
+CREATE TABLE savings_plans (id TEXT PRIMARY KEY,name TEXT NOT NULL,target_minor INTEGER NOT NULL CHECK(target_minor>0),mode TEXT NOT NULL CHECK(mode IN('ACCOUNTS','MANUAL')),manual_minor INTEGER NOT NULL DEFAULT 0 CHECK(manual_minor>=0),due_date TEXT,note TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN('ACTIVE','COMPLETED','ARCHIVED')),revision INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1))) STRICT;
+CREATE TABLE savings_plan_accounts (plan_id TEXT NOT NULL REFERENCES savings_plans(id),account_id TEXT NOT NULL REFERENCES accounts(id),PRIMARY KEY(plan_id,account_id)) STRICT;
+CREATE INDEX savings_plan_status ON savings_plans(deleted,status,due_date);
+`,
+  },
 ];
-export const currentSchema = 7;
+export const currentSchema = 8;

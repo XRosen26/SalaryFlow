@@ -109,7 +109,7 @@ export default function SettingsScreen() {
   const db = useSQLiteContext();
   const { snapshot, error, refresh, setAmountsVisible } = useFinance();
   const [busy, setBusy] = useState(false);
-  const [resetText, setResetText] = useState("");
+  const [resetReason, setResetReason] = useState("");
 
   if (!snapshot)
     return (
@@ -186,14 +186,13 @@ export default function SettingsScreen() {
   };
 
   const clearLedger = () => {
-    if (resetText !== "重新开始") return;
     Alert.alert(
-      "最后确认",
-      "这会清空手机上的账户、交易、预算和账单，并恢复为初始模板。系统会先在应用目录保存恢复点。",
+      "确认清空手机账本",
+      "这会清空手机上的账户、交易、预算、账单和存钱计划，并恢复初始模板。操作前会自动建立本地恢复点。",
       [
         { text: "取消", style: "cancel" },
         {
-          text: "清空并重新开始",
+          text: "确认清空",
           style: "destructive",
           onPress: () => {
             void (async () => {
@@ -202,9 +201,9 @@ export default function SettingsScreen() {
                 await import("@/data/backup").then(({ writeBackup }) =>
                   writeBackup(db, true),
                 );
-                await resetLedger(db);
+                await resetLedger(db, resetReason);
                 await refresh();
-                setResetText("");
+                setResetReason("");
                 Alert.alert(
                   "已重新开始",
                   "手机账本已清空，并恢复为不含个人数据的初始账户与预算模板。",
@@ -212,9 +211,7 @@ export default function SettingsScreen() {
               } catch (reason) {
                 Alert.alert(
                   "清空失败",
-                  reason instanceof Error
-                    ? reason.message
-                    : "当前账本没有被清空",
+                  reason instanceof Error ? reason.message : "当前账本没有被清空",
                 );
               } finally {
                 setBusy(false);
@@ -468,12 +465,12 @@ export default function SettingsScreen() {
           <Text
             style={[styles.rowDescription, { color: colors.textSecondary }]}
           >
-            输入“重新开始”后才能执行；操作前自动建立本地恢复点。
+            点击后会再次确认；操作前自动建立本地恢复点。清空原因可不填写。
           </Text>
           <TextInput
-            value={resetText}
-            onChangeText={setResetText}
-            placeholder="输入：重新开始"
+            value={resetReason}
+            onChangeText={setResetReason}
+            placeholder="清空原因（可选）"
             placeholderTextColor={colors.textSecondary}
             style={[
               styles.input,
@@ -482,13 +479,13 @@ export default function SettingsScreen() {
           />
           <Pressable
             accessibilityRole="button"
-            disabled={busy || resetText !== "重新开始"}
+            disabled={busy}
             onPress={clearLedger}
             style={[
               styles.dangerButton,
               {
                 backgroundColor: colors.expense,
-                opacity: busy || resetText !== "重新开始" ? 0.35 : 1,
+                opacity: busy ? 0.5 : 1,
               },
             ]}
           >

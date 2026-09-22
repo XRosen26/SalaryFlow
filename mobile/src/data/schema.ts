@@ -1,4 +1,4 @@
-export const DATABASE_VERSION = 4;
+export const DATABASE_VERSION = 5;
 
 export const schemaSql = `
 PRAGMA journal_mode = WAL;
@@ -238,6 +238,27 @@ CREATE TABLE IF NOT EXISTS receivable_repayments (
 CREATE INDEX IF NOT EXISTS receivable_status_due ON receivables(status,due_date);
 CREATE INDEX IF NOT EXISTS receivable_person ON receivables(person);
 CREATE INDEX IF NOT EXISTS repayment_receivable_date ON receivable_repayments(receivable_id,date);
+
+CREATE TABLE IF NOT EXISTS savings_plans (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  target_minor INTEGER NOT NULL CHECK(target_minor>0),
+  mode TEXT NOT NULL CHECK(mode IN('ACCOUNTS','MANUAL')),
+  manual_minor INTEGER NOT NULL DEFAULT 0 CHECK(manual_minor>=0),
+  due_date TEXT,
+  note TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN('ACTIVE','COMPLETED','ARCHIVED')),
+  revision INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN(0,1))
+) STRICT;
+CREATE TABLE IF NOT EXISTS savings_plan_accounts (
+  plan_id TEXT NOT NULL REFERENCES savings_plans(id),
+  account_id TEXT NOT NULL REFERENCES accounts(id),
+  PRIMARY KEY(plan_id,account_id)
+) STRICT;
+CREATE INDEX IF NOT EXISTS savings_plan_status ON savings_plans(deleted,status,due_date);
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY,

@@ -184,7 +184,11 @@ export default function HomeScreen() {
             <Ionicons name="help-circle-outline" size={24} color="#FFFFFF" />
           </Pressable>
         </View>
-        <Text style={styles.heroHint}>{safeState.hint}</Text>
+        <Text style={styles.heroHint}>
+          {hidden && safeState.key === "OVER_BUDGET"
+            ? "本期已经超支，建议暂停非必要支出"
+            : safeState.hint}
+        </Text>
         {safeAction ? (
           <Pressable
             accessibilityRole="button"
@@ -220,6 +224,20 @@ export default function HomeScreen() {
           {snapshot.cycle.start} — {addDays(snapshot.cycle.end, -1)}
         </Text>
       </Card>
+
+      <Pressable
+        onPress={() => router.push("/savings-plans" as never)}
+        style={[styles.savingsEntry, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <View style={[styles.savingsIcon, { backgroundColor: colors.primarySoft }]}>
+          <Ionicons name="flag-outline" size={21} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.itemTitle, { color: colors.text }]}>存钱计划</Text>
+          <Text style={[styles.meta, { color: colors.textSecondary }]}>设定目标，关联储蓄账户，查看还差多少</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      </Pressable>
 
       {snapshot.summary.receivableOverdueCount > 0 ||
       snapshot.summary.receivableDueTodayCount > 0 ? (
@@ -479,6 +497,8 @@ const styles = StyleSheet.create({
   },
   itemTitle: { fontSize: 15, fontWeight: "700" },
   amountPair: { fontSize: 12, fontVariant: ["tabular-nums"] },
+  savingsEntry: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
+  savingsIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   receivableNotice: {
     minHeight: 66,
     borderWidth: 1,

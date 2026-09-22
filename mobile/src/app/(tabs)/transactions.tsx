@@ -24,7 +24,7 @@ import { radius, spacing, useAppTheme } from "@/constants/theme";
 import { useFinance } from "@/data/finance-context";
 import { loadTransactions, type TransactionItem } from "@/data/repository";
 import { addDays, normalizeDateInput, today } from "@/domain/dates";
-import { parseMoneyExpression } from "@/domain/money";
+import { formatMoney, parseMoneyExpression } from "@/domain/money";
 
 type Filter = "ALL" | TransactionItem["kind"] | "RECEIVABLE";
 type Sort =
@@ -443,6 +443,15 @@ export default function TransactionsScreen() {
                       {item.date} · {account}
                       {item.note ? " · " + item.note : ""}
                     </Text>
+                    {item.kind === "EXPENSE" && (item.refundMinor ?? 0) > 0 ? (
+                      <Text style={[styles.refundStatus, { color: colors.income }]}>
+                        {item.fullyRefunded
+                          ? "已全额退款"
+                          : hidden
+                            ? "已有部分退款"
+                            : `已退款 ${formatMoney(item.refundMinor ?? 0)}`}
+                      </Text>
+                    ) : null}
                   </View>
                   <MoneyAmount
                     value={item.amountMinor}
@@ -554,6 +563,7 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1, gap: 4 },
   title: { fontSize: 15, fontWeight: "700" },
+  refundStatus: { fontSize: 12, fontWeight: "800", marginTop: 3 },
   meta: { fontSize: 12 },
   empty: { alignItems: "center", paddingVertical: 48, gap: spacing.sm },
   emptyTitle: { fontSize: 16, fontWeight: "700" },

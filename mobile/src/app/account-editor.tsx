@@ -7,7 +7,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { AppScreen, Card, LoadingState, PageHeader } from '@/components/ui';
 import { radius, spacing, useAppTheme } from '@/constants/theme';
 import { useFinance } from '@/data/finance-context';
-import { archiveAccount, saveAccount, type AccountInput } from '@/data/repository';
+import { archiveAccount, calibrateAccount, saveAccount, type AccountInput } from '@/data/repository';
 import { today } from '@/domain/dates';
 import { parseMoney } from '@/domain/money';
 
@@ -46,6 +46,7 @@ export default function AccountEditorScreen() {
   const [typeId, setTypeId] = useState<AccountInput['typeId']>('bank');
   const [role, setRole] = useState<Role | ''>('');
   const [opening, setOpening] = useState('');
+  const [currentBalance, setCurrentBalance] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -53,12 +54,13 @@ export default function AccountEditorScreen() {
     if (!existing) return;
     setName(existing.name);
     setTypeId(existing.typeId);
+    setCurrentBalance((existing.balanceMinor / 100).toFixed(2));
     setRole((existing.roles.find((item) => roles.some((roleOption) => roleOption.id === item)) as Role | undefined) ?? '');
   }, [existing]);
 
   if (!snapshot) return <AppScreen><LoadingState error={error} /></AppScreen>;
 
-  const submit = async () => {
+  const saveChanges = async (targetBalance?: number) => {
     try {
       setSaving(true);
       await saveAccount(db, {
@@ -70,12 +72,33 @@ export default function AccountEditorScreen() {
         startDate: today(),
         note,
       });
+      if (existing && targetBalance !== undefined && targetBalance !== existing.balanceMinor)
+        await calibrateAccount(db, existing.id, targetBalance, "用户确认调整当前余额");
       await refresh();
       router.back();
     } catch (reason) {
       Alert.alert('账户没有保存', reason instanceof Error ? reason.message : '请检查输入');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const submit = () => {
+    if (!existing) return void saveChanges();
+    try {
+      const target = Number(parseMoney(currentBalance, { zero: true, signed: true }));
+      if (target === existing.balanceMinor) return void saveChanges(target);
+      const delta = target - existing.balanceMinor;
+      Alert.alert(
+        "确认调整账户余额",
+        `当前余额将从 ¥ ${(existing.balanceMinor / 100).toFixed(2)} 调整为 ¥ ${(target / 100).toFixed(2)}。系统会记录一笔余额校准 ${delta >= 0 ? "+" : ""}¥ ${(delta / 100).toFixed(2)}，不会计入收入或支出。`,
+        [
+          { text: "取消", style: "cancel" },
+          { text: "确认调整", onPress: () => void saveChanges(target) },
+        ],
+      );
+    } catch (reason) {
+      Alert.alert("余额无效", reason instanceof Error ? reason.message : "请检查输入");
     }
   };
 
@@ -119,13 +142,13 @@ export default function AccountEditorScreen() {
         <Text style={[styles.help, { color: colors.textSecondary }]}>同一主要角色只保留一个账户；设置新账户时会自动取消旧账户的该角色。</Text>
         <View style={styles.choices}>{roles.map((item) => <Choice key={item.id || 'none'} value={item.id} current={role} label={item.label} onChange={setRole} />)}</View>
       </View>
-      {!existing ? (
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.text }]}>当前余额（可选）</Text>
-          <TextInput value={opening} onChangeText={setOpening} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]} />
-          <Text style={[styles.help, { color: colors.textSecondary }]}>作为期初余额保存，不计作收入。</Text>
-        </View>
-      ) : null}
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.text }]}>{existing ? "调整当前余额" : "当前余额（可选）"}</Text>
+        <TextInput value={existing ? currentBalance : opening} onChangeText={existing ? setCurrentBalance : setOpening} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]} />
+        <Text style={[styles.help, { color: colors.textSecondary }]}>
+          {existing ? "保存前会再次确认，并记录余额校准；校准不计入收入或支出。" : "作为期初余额保存，不计作收入。"}
+        </Text>
+      </View>
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.text }]}>备注（可选）</Text>
         <TextInput value={note} onChangeText={setNote} placeholder="银行卡尾号、用途等" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]} />
@@ -136,7 +159,7 @@ export default function AccountEditorScreen() {
           <Text style={[styles.noticeText, { color: colors.text }]}>理财账户以后通过市值快照更新；市值涨跌不会伪装成收入或支出。</Text>
         </Card>
       ) : null}
-      <Pressable disabled={saving} onPress={() => void submit()} style={[styles.save, { backgroundColor: colors.primary, opacity: saving ? 0.5 : 1 }]}>
+      <Pressable disabled={saving} onPress={submit} style={[styles.save, { backgroundColor: colors.primary, opacity: saving ? 0.5 : 1 }]}>
         <Text style={styles.saveText}>{saving ? '正在保存…' : '保存账户'}</Text>
       </Pressable>
       {existing ? <Pressable onPress={archive} style={[styles.archive, { borderColor: colors.expense }]}><Text style={[styles.archiveText, { color: colors.expense }]}>归档此账户</Text></Pressable> : null}

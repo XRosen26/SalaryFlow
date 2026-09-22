@@ -24,6 +24,8 @@ const TABLES = [
   "external_keys",
   "receivables",
   "receivable_repayments",
+  "savings_plans",
+  "savings_plan_accounts",
   "schema_migrations",
 ] as const;
 
@@ -36,9 +38,9 @@ type BackupRow = Record<string, SQLiteBindValue>;
 type BackupBase = {
   format: "salaryflow-ledger";
   formatVersion: 1;
-  schemaVersion: 4;
+  schemaVersion: 4 | 5;
   createdAt: string;
-  source: { platform: "mobile"; appVersion: "0.6.2" };
+  source: { platform: "mobile"; appVersion: "0.6.3" };
   tables: Record<TableName, BackupRow[]>;
 };
 
@@ -65,9 +67,9 @@ export async function buildBackup(db: SQLiteDatabase): Promise<BackupDocument> {
   const base: BackupBase = {
     format: "salaryflow-ledger",
     formatVersion: 1,
-    schemaVersion: 4,
+    schemaVersion: 5,
     createdAt: new Date().toISOString(),
-    source: { platform: "mobile", appVersion: "0.6.2" },
+    source: { platform: "mobile", appVersion: "0.6.3" },
     tables,
   };
   return {
@@ -132,7 +134,7 @@ async function parseBackup(text: string): Promise<BackupDocument> {
   if (
     value.format !== "salaryflow-ledger" ||
     value.formatVersion !== 1 ||
-    value.schemaVersion !== 4
+    ![4, 5].includes(Number(value.schemaVersion))
   ) {
     throw new Error("备份格式或版本不受支持");
   }
@@ -155,6 +157,8 @@ async function parseBackup(text: string): Promise<BackupDocument> {
   }
   document.tables.receivables ??= [];
   document.tables.receivable_repayments ??= [];
+  document.tables.savings_plans ??= [];
+  document.tables.savings_plan_accounts ??= [];
   return document;
 }
 

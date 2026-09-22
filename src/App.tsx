@@ -39,6 +39,7 @@ import {
   Archive,
   FolderOpen,
   FileText,
+  PiggyBank,
 } from "lucide-react";
 import { Help } from "./Help";
 import brandIcon from "../build/icon.png";
@@ -104,6 +105,7 @@ const pages = [
   { key: "allocations", label: msg("工资分配"), icon: Sparkles },
   { key: "receivables", label: msg("待收款"), icon: Banknote },
   { key: "accounts", label: msg("我的账户"), icon: Landmark },
+  { key: "savings", label: msg("存钱计划"), icon: PiggyBank },
   { key: "analysis", label: msg("统计分析"), icon: ChartNoAxesCombined },
   { key: "help", label: msg("帮助与使用手册"), icon: CircleHelp },
   { key: "settings", label: msg("设置与数据"), icon: Settings2 },
@@ -704,6 +706,98 @@ export default function App() {
       ),
     });
   }
+  function openSavingsPlan(plan: Data | null = null) {
+    const linked = new Set(plan?.account_ids || []);
+    const accountFields: Field[] = accounts.map((account: Data) => ({
+      name: "account_" + account.id,
+      label: localized(account.name),
+      type: "checkbox",
+      hint: msg("使用此账户余额计算进度"),
+      visible: (values: Data) => values.mode === "ACCOUNTS",
+    }));
+    setModal({
+      title: plan ? msg("修改存钱计划") : msg("新建存钱计划"),
+      subtitle: msg(
+        "关联账户只读取所选账户当前余额，不移动资金；手动模式由你填写进度。",
+      ),
+      wide: true,
+      body: (
+        <Form
+          fields={[
+            { name: "name", label: msg("计划名称") },
+            {
+              name: "target_minor",
+              label: msg("目标金额（元）"),
+              type: "money",
+            },
+            {
+              name: "mode",
+              label: msg("进度计算方式"),
+              type: "select",
+              options: [
+                { value: "ACCOUNTS", label: msg("关联账户余额") },
+                { value: "MANUAL", label: msg("手动维护进度") },
+              ],
+            },
+            {
+              name: "manual_minor",
+              label: msg("当前已存（元）"),
+              type: "money",
+              required: false,
+              visible: (values: Data) => values.mode === "MANUAL",
+            },
+            {
+              name: "due_date",
+              label: msg("目标日期"),
+              type: "date",
+              required: false,
+            },
+            ...accountFields,
+            {
+              name: "note",
+              label: msg("备注"),
+              type: "textarea",
+              required: false,
+            },
+          ]}
+          initial={{
+            name: plan?.name || "",
+            target_minor: plan ? decimal(plan.target_minor) : "",
+            mode: plan?.mode || "ACCOUNTS",
+            manual_minor: plan ? decimal(plan.current_minor) : "0.00",
+            due_date: plan?.due_date || "",
+            note: plan?.note || "",
+            ...Object.fromEntries(
+              accounts.map((a: Data) => ["account_" + a.id, linked.has(a.id)]),
+            ),
+          }}
+          onSubmit={async (values, op) => {
+            const account_ids = accounts
+              .filter((a: Data) => values["account_" + a.id])
+              .map((a: Data) => a.id);
+            await mutate(
+              "saveSavingsPlan",
+              {
+                id: plan?.id,
+                name: values.name,
+                target_minor: parseMoneyExpression(values.target_minor),
+                mode: values.mode,
+                manual_minor: parseMoneyExpression(values.manual_minor || "0", {
+                  zero: true,
+                }),
+                due_date: values.due_date || null,
+                note: values.note || "",
+                account_ids,
+              },
+              op,
+            );
+            close();
+          }}
+        />
+      ),
+    });
+  }
+
   function goto(key: string, q: Data = {}) {
     sessionStorage.setItem("salaryflow.page", key);
     setPage(key);
@@ -1512,6 +1606,16 @@ export default function App() {
                           ? msg("不计收入、支出与预算")
                           : t.note || kinds[t.kind]}
                       </small>
+                      {t.kind === "EXPENSE" &&
+                        BigInt(t.refund_minor || "0") > 0n && (
+                          <small className="refund-status">
+                            {t.fully_refunded
+                              ? msg("已全额退款")
+                              : canShowAmount()
+                                ? `${msg("已退款")} ¥ ${money(t.refund_minor)}`
+                                : msg("已有部分退款")}
+                          </small>
+                        )}
                     </div>
                   </div>
                 </td>
@@ -1632,6 +1736,7 @@ export default function App() {
     transactions: msg("真实记录每一笔，让账目始终清楚。"),
     budget: msg("预算先行，为生活留出从容。"),
     accounts: msg("钱在哪里，一目了然。"),
+    savings: msg("设定目标，看见每一次积累。"),
     allocations: msg("工资到账后，补足生活资金，再安排储蓄与理财。"),
     analysis: msg("用真实记录，看见财务的变化。"),
     bills: msg("管理重复规则、到期待办和处理历史。"),
@@ -3387,6 +3492,106 @@ export default function App() {
               </div>
             </>
           )}
+          {page === "savings" && (
+            <>
+              <section className="panel section-heading">
+                <div>
+                  <h2>{msg("存钱计划")}</h2>
+                  <p>
+                    {msg(
+                      "关联储蓄或理财账户时自动读取余额；也可以手动维护进度。",
+                    )}
+                  </p>
+                </div>
+                <button className="primary" onClick={() => openSavingsPlan()}>
+                  <Plus size={17} />
+                  {msg("新建计划")}
+                </button>
+              </section>
+              <div className="savings-plan-grid">
+                {(data.savingsPlans || []).length ? (
+                  data.savingsPlans.map((plan: Data) => (
+                    <section className="panel savings-plan-card" key={plan.id}>
+                      <div className="savings-plan-head">
+                        <div>
+                          <h3>{plan.name}</h3>
+                          <small className="muted">
+                            {plan.mode === "ACCOUNTS"
+                              ? `${msg("关联账户")}：${plan.account_names.join("、")}`
+                              : msg("手动维护进度")}
+                            {plan.due_date
+                              ? ` · ${msg("目标日期")} ${plan.due_date}`
+                              : ""}
+                          </small>
+                        </div>
+                        <strong>{Math.round(plan.progress * 100)}%</strong>
+                      </div>
+                      <div className="savings-progress">
+                        <span
+                          style={{
+                            width: `${Math.max(2, plan.progress * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="savings-figures">
+                        <div>
+                          <small>{msg("目前")}</small>
+                          <b>¥ {fmt(plan.current_minor)}</b>
+                        </div>
+                        <div>
+                          <small>{msg("还差")}</small>
+                          <b>¥ {fmt(plan.remaining_minor)}</b>
+                        </div>
+                        <div>
+                          <small>{msg("目标")}</small>
+                          <b>¥ {fmt(plan.target_minor)}</b>
+                        </div>
+                      </div>
+                      <p className="muted">
+                        {plan.progress >= 1
+                          ? msg("目标已达成，做得很好。")
+                          : plan.progress >= 0.8
+                            ? msg("已经很接近目标，继续保持。")
+                            : msg("每一次积累，都在靠近目标。")}
+                      </p>
+                      {plan.note && <p>{plan.note}</p>}
+                      <div className="row-actions">
+                        <button onClick={() => openSavingsPlan(plan)}>
+                          <Pencil size={15} />
+                          {msg("修改")}
+                        </button>
+                        <button
+                          className="danger-link"
+                          onClick={() =>
+                            confirm(
+                              msg("删除存钱计划"),
+                              msg("只删除计划，不会删除账户和交易。"),
+                              async (_, op) =>
+                                mutate(
+                                  "deleteSavingsPlan",
+                                  { id: plan.id },
+                                  op,
+                                ),
+                            )
+                          }
+                        >
+                          <Trash2 size={15} />
+                          {msg("删除")}
+                        </button>
+                      </div>
+                    </section>
+                  ))
+                ) : (
+                  <section className="panel">
+                    <Empty
+                      title={msg("还没有存钱计划")}
+                      hint={msg("例如旅行备用金、应急金或设备购置目标。")}
+                    />
+                  </section>
+                )}
+              </div>
+            </>
+          )}
           {page === "analysis" && (
             <>
               <section className="panel range-panel">
@@ -3519,6 +3724,28 @@ export default function App() {
                 <span className="muted">
                   {data.report.start} — {addDays(data.report.end, -1)}
                 </span>
+                <select
+                  aria-label={msg("统计账户")}
+                  title={msg(
+                    "选择账户后，收入按入账账户、支出按付款账户、退款按退回账户统计",
+                  )}
+                  value={query.account_id || ""}
+                  onChange={(e) =>
+                    setQuery({
+                      ...query,
+                      account_id: e.target.value || undefined,
+                    })
+                  }
+                >
+                  <option value="">{msg("全部账户")}</option>
+                  {data.accounts
+                    .filter((a: Data) => !a.archived)
+                    .map((a: Data) => (
+                      <option key={a.id} value={a.id}>
+                        {localized(a.name)}
+                      </option>
+                    ))}
+                </select>
                 <button
                   onClick={() =>
                     act(async () => {
@@ -4087,7 +4314,7 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.9.2 · Windows 与移动端本地个人预算、现金流和资产管理",
+                          "SalaryFlow 0.9.3 · Windows 与移动端本地个人预算、现金流、储蓄目标和资产管理",
                         )}
                       </p>
                       <p>
@@ -5507,12 +5734,31 @@ function Allocation({
   onDone: () => Promise<void>;
 }) {
   const [quote, setQuote] = useState<Data | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [customTopup, setCustomTopup] = useState("");
   const show = (value: any) =>
     amountVisible(data.settings) ? money(value) : "••••";
   const source = data.accounts.find(
     (account: Data) => account.id === salary.destination_id,
   );
+  const recalculateTopup = async (mode: string) => {
+    if (!quote) return;
+    try {
+      setError("");
+      setQuote(
+        await api("allocationQuote", {
+          ...quote.input,
+          topup_mode: mode,
+          topup_minor:
+            mode === "CUSTOM"
+              ? parseMoneyExpression(customTopup || "0", { zero: true })
+              : undefined,
+        }),
+      );
+    } catch (e: any) {
+      setError(msg(e.message));
+    }
+  };
   const accountOptions = data.accounts
     .filter((account: Data) => !account.archived)
     .map((account: Data) => ({
@@ -5664,6 +5910,51 @@ function Allocation({
               </div>
             ))}
           </div>
+          {(quote.overspent ||
+            BigInt(quote.spending_balance) < BigInt(quote.total_budget)) && (
+            <div className="allocation-warning">
+              <strong>{msg("本期超支或消费资金不足")}</strong>
+              <p>
+                {msg(
+                  "本期超支了哦，建议更新预算或者减少非必要开支。以下操作只补充消费账户资金，不会重置预算，也不会计作收入或支出。",
+                )}
+              </p>
+              <div className="quick-presets">
+                <button type="button" onClick={() => recalculateTopup("FULL")}>
+                  {msg("补齐至完整预算")}
+                </button>
+                <button type="button" onClick={() => recalculateTopup("HALF")}>
+                  {msg("补齐至50%")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => recalculateTopup("ADD300")}
+                >
+                  +300
+                </button>
+                <button
+                  type="button"
+                  onClick={() => recalculateTopup("ADD500")}
+                >
+                  +500
+                </button>
+              </div>
+              <div className="custom-topup">
+                <input
+                  value={customTopup}
+                  onChange={(e) => setCustomTopup(e.target.value)}
+                  inputMode="decimal"
+                  placeholder={msg("其他补齐金额")}
+                />
+                <button
+                  type="button"
+                  onClick={() => recalculateTopup("CUSTOM")}
+                >
+                  {msg("应用")}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="quote-result">
             <div>
               <small>{msg("建议转入消费账户")}</small>

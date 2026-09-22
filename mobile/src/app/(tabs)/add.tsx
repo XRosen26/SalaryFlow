@@ -5,9 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -230,7 +228,7 @@ export default function AddScreen() {
     return (
       <AppScreen>
         <LoadingState error={error} />
-      </AppScreen>
+    </AppScreen>
     );
   const categories = snapshot.categories.filter(
     (category) => category.kind === (kind === "INCOME" ? "INCOME" : "EXPENSE"),
@@ -329,11 +327,7 @@ export default function AddScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <AppScreen>
+    <AppScreen>
         <PageHeader
           title={params.id ? "修改交易" : "记一笔"}
           subtitle={
@@ -601,13 +595,11 @@ export default function AddScreen() {
               : `保存${kinds.find((item) => item.id === kind)?.label}`}
           </Text>
         </Pressable>
-      </AppScreen>
-    </KeyboardAvoidingView>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   segment: { flexDirection: "row", borderRadius: radius.md, padding: 4 },
   segmentItem: {
     flex: 1,

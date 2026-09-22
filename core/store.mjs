@@ -227,6 +227,8 @@ export class Store {
       "createReceivable",
       "repayReceivable",
       "deleteReceivable",
+      "saveSavingsPlan",
+      "deleteSavingsPlan",
     ];
     ensure(allowed.includes(action), "操作不可用");
     const digest = hash(json({ action, payload }));
@@ -1883,9 +1885,13 @@ export class Store {
       clauses.push("t.category_version_id=?");
       filter.push(p.category_version_id);
     }
-    if (p.kind) {
+    if (p.kind === "REFUND") {
+      clauses.push("t.kind='EXPENSE' AND EXISTS(SELECT 1 FROM transactions rf WHERE rf.original_id=t.id AND rf.kind='REFUND' AND rf.deleted=0)");
+    } else if (p.kind) {
       clauses.push("t.kind=?");
       filter.push(p.kind);
+    } else {
+      clauses.push("t.kind!='REFUND'");
     }
     if (
       p.min_amount !== undefined &&
@@ -1943,7 +1949,16 @@ export class Store {
         t.id,
         t.id,
       );
-      return { ...t, ...receivable, amount_minor: String(t.amount_minor) };
+      const refund = t.kind === "EXPENSE"
+        ? this.one("SELECT COALESCE(SUM(amount_minor),0) amount FROM transactions WHERE original_id=? AND kind='REFUND' AND deleted=0", t.id)
+        : null;
+      return {
+        ...t,
+        ...receivable,
+        amount_minor: String(t.amount_minor),
+        refund_minor: String(refund?.amount ?? 0),
+        fully_refunded: t.kind === "EXPENSE" && BigInt(refund?.amount ?? 0) >= BigInt(t.amount_minor),
+      };
     });
     if (p.analysis) {
       const length = Math.round(
@@ -1956,11 +1971,13 @@ export class Store {
         p.account_id || null,
       );
       const stmt = this.db.prepare(
-        "SELECT v.id,v.name,SUM(t.amount_minor) amount FROM transactions t JOIN category_versions v ON v.id=t.category_version_id WHERE t.deleted=0 AND t.kind='INCOME' AND t.date>=? AND t.date<? GROUP BY v.id ORDER BY amount DESC",
+        "SELECT v.id,v.name,SUM(t.amount_minor) amount FROM transactions t JOIN category_versions v ON v.id=t.category_version_id WHERE t.deleted=0 AND t.kind='INCOME' AND t.date>=? AND t.date<?" +
+          (p.account_id ? " AND t.destination_id=?" : "") +
+          " GROUP BY v.id ORDER BY amount DESC",
       );
       stmt.setReadBigInts(true);
       report.incomeGroups = stmt
-        .all(start, end)
+        .all(start, end, ...(p.account_id ? [p.account_id] : []))
         .map((r) => ({ ...r, amount: String(r.amount) }));
     }
     const ledgerStart = this.one(
@@ -2034,6 +2051,7 @@ export class Store {
       cycleRules: this.all(
         "SELECT * FROM cycle_rules ORDER BY effective_from DESC",
       ),
+      savingsPlans: this.savingsPlans(),
       receivables: this.all(
         "SELECT r.*,s.name source_account_name,d.name return_account_name FROM receivables r JOIN accounts s ON s.id=r.source_account_id LEFT JOIN accounts d ON d.id=r.default_return_account_id WHERE r.deleted=0 ORDER BY CASE r.status WHEN 'OPEN' THEN 0 ELSE 1 END,COALESCE(r.due_date,'9999-12-31'),r.created_at DESC",
       ).map((r) => ({
@@ -2088,6 +2106,73 @@ export class Store {
       after: a.after_data ? JSON.parse(a.after_data) : null,
     }));
   }
+  savingsPlans() {
+    const balances = this.balances();
+    return this.all(
+      "SELECT * FROM savings_plans WHERE deleted=0 ORDER BY CASE status WHEN 'ACTIVE' THEN 0 WHEN 'COMPLETED' THEN 1 ELSE 2 END,due_date IS NULL,due_date,created_at DESC",
+    ).map((plan) => {
+      const linked = this.all(
+        "SELECT a.id,a.name FROM savings_plan_accounts p JOIN accounts a ON a.id=p.account_id WHERE p.plan_id=? AND a.deleted=0 AND a.archived=0 ORDER BY a.name",
+        plan.id,
+      );
+      const current =
+        plan.mode === "ACCOUNTS"
+          ? linked.reduce((sum, account) => sum + (balances[account.id] ?? 0n), 0n)
+          : BigInt(plan.manual_minor);
+      const target = BigInt(plan.target_minor);
+      return {
+        ...plan,
+        target_minor: String(target),
+        current_minor: String(current < 0n ? 0n : current),
+        remaining_minor: String(current >= target ? 0n : target - current),
+        progress: target > 0n ? Math.min(1, Number(current < 0n ? 0n : current) / Number(target)) : 0,
+        account_ids: linked.map((account) => account.id),
+        account_names: linked.map((account) => account.name),
+      };
+    });
+  }
+  saveSavingsPlan(p) {
+    const old = p.id
+      ? this.one("SELECT * FROM savings_plans WHERE id=? AND deleted=0", p.id)
+      : null;
+    if (p.id) ensure(old, "存钱计划不存在");
+    const name = label(p.name, "计划名称");
+    const target = minor(p.target_minor);
+    const mode = p.mode || "ACCOUNTS";
+    ensure(["ACCOUNTS", "MANUAL"].includes(mode), "计划进度模式无效");
+    const manual = minor(p.manual_minor ?? "0", { zero: true });
+    const due = p.due_date ? date(p.due_date) : null;
+    const accountIds = [...new Set(p.account_ids || [])];
+    if (mode === "ACCOUNTS") {
+      ensure(accountIds.length > 0, "请至少关联一个账户");
+      for (const accountId of accountIds) this.account(accountId);
+    }
+    const planId = old?.id ?? id(), timestamp = now();
+    if (old) {
+      this.run(
+        "UPDATE savings_plans SET name=?,target_minor=?,mode=?,manual_minor=?,due_date=?,note=?,status='ACTIVE',revision=revision+1,updated_at=? WHERE id=?",
+        name,target,mode,manual,due,safeNote(p.note),timestamp,planId,
+      );
+      this.run("DELETE FROM savings_plan_accounts WHERE plan_id=?", planId);
+    } else {
+      this.run(
+        "INSERT INTO savings_plans(id,name,target_minor,mode,manual_minor,due_date,note,status,revision,created_at,updated_at,deleted) VALUES(?,?,?,?,?,?,?,'ACTIVE',1,?,?,0)",
+        planId,name,target,mode,manual,due,safeNote(p.note),timestamp,timestamp,
+      );
+    }
+    if (mode === "ACCOUNTS")
+      for (const accountId of accountIds)
+        this.run("INSERT INTO savings_plan_accounts(plan_id,account_id) VALUES(?,?)",planId,accountId);
+    this.audit("savings_plan",planId,old,this.one("SELECT * FROM savings_plans WHERE id=?",planId),old ? "修改存钱计划" : "新增存钱计划");
+    return { id: planId };
+  }
+  deleteSavingsPlan(p) {
+    const plan = this.one("SELECT * FROM savings_plans WHERE id=? AND deleted=0",p.id);
+    ensure(plan,"存钱计划不存在");
+    this.run("UPDATE savings_plans SET deleted=1,revision=revision+1,updated_at=? WHERE id=?",now(),p.id);
+    this.audit("savings_plan",p.id,plan,{...plan,deleted:1},"删除存钱计划");
+  }
+
   createReceivable(p) {
     const person = label(p.person);
     const lentDate = date(p.lent_date);
@@ -2463,7 +2548,16 @@ export class Store {
       max(0n, cap - countedAllocation),
       max(0n, sourceBalance - reserve),
     );
-    const needed = max(0n, remainingBudget - max(0n, spendingBalance));
+    const topupMode = p.topup_mode || "REMAINING";
+    ensure(["REMAINING","FULL","HALF","ADD300","ADD500","CUSTOM"].includes(topupMode),"补齐方案无效");
+    const targetBalance =
+      topupMode === "FULL" ? totalBudget
+      : topupMode === "HALF" ? totalBudget / 2n
+      : topupMode === "ADD300" ? max(0n, spendingBalance) + 30000n
+      : topupMode === "ADD500" ? max(0n, spendingBalance) + 50000n
+      : topupMode === "CUSTOM" ? max(0n, spendingBalance) + minor(p.topup_minor ?? "0", { zero: true })
+      : remainingBudget;
+    const needed = max(0n, targetBalance - max(0n, spendingBalance));
     const topup = source.id === spending.id ? 0n : min(needed, available);
     const saving =
       source.id === spending.id
@@ -2512,9 +2606,11 @@ export class Store {
       saving: String(saving),
       shortage: String(max(0n, needed - available)),
       limit_mode: limitMode,
+      topup_mode: topupMode,
+      overspent: BigInt(report.net) > totalBudget,
       revision: this.settings().revision,
       items,
-      input: { ...p, limit_mode: limitMode, cap_minor: String(cap) },
+      input: { ...p, limit_mode: limitMode, cap_minor: String(cap), topup_mode: topupMode },
     };
   }
   saveAllocation(p) {

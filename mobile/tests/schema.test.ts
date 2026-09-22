@@ -19,6 +19,8 @@ test("Android SQLite 初始 schema 可以一次建成并启用核心约束", () 
     "audit",
     "receivables",
     "receivable_repayments",
+    "savings_plans",
+    "savings_plan_accounts",
     "schema_migrations",
   ]) {
     assert.ok(tables.includes(required), `missing ${required}`);

@@ -1,4 +1,14 @@
-# 验证记录 · Windows 0.9.2 / Android 0.6.2
+# 验证记录 · Windows 0.9.3 / Android 0.6.3
+
+## Windows 0.9.3 / Android 0.6.3 验收 · 2026-09-22
+
+Windows：66项Node财务、周期、迁移与可靠性测试全部通过，TypeScript/Vite生产构建通过；源码程序与最终解包程序均使用项目内隔离账本完成完整桌面流程。验收覆盖首次设置、记账、预算、账户、固定账单、待收款、存钱计划、统计、主题、帮助与1100像素布局；存钱计划从界面输入 10000.50 元，最终准确保存为 1000050 分并关联指定账户。便携自解压程序不适合Playwright直接接管，本轮自动化以相同ASAR内容的解包程序为准。PC数据库schema 8。
+
+Android：TypeScript检查和12项领域/数据库测试通过；ARM64 Release完成576个Gradle任务，通过Lint Vital、资源优化、Dex、V2预览签名和打包。APK确认versionName 0.6.3、versionCode 10、minSdk 24、target/compileSdk 36，仅含arm64-v8a；简体中文启动器名为“薪流”，英文为“SalaryFlow”；权限仅含震动及应用内部动态接收器权限。移动数据库schema 5。
+
+发布安全：Windows ASAR共4059个条目，Android APK共1235个条目；两端包内均未发现SQLite账本、数据库、备份、用户路径或个人数据。Windows安装版和便携版Authenticode状态均为NotSigned。发布物SHA-256：安装版 575680F75AD09B67CA9D25D3BA74010A62E35D2D6703B10E39CC1408337F3CA7；便携版 FA145E3553E1F376C131D0AC0F6826A1F08D0E8E1CEEDCFB00265436DBFCB2A9；Android APK 3A60DD373E6A9D3661652BF5A275DDDE4A86A112424AD6FAF1E3C35FD428F7D5。
+
+本轮未连接真实Android/iOS设备；Android厂商系统、软键盘、大字体和长期运行仍需真机试用。Android包使用开发预览签名，适合安装测试，不用于正式应用市场发布。iOS保留0.6.3、buildNumber 10和Bundle ID配置，但Windows不能执行Xcode原生编译与签名，因此本次不提供IPA。
 
 ## Windows 0.9.2 / Android 0.6.2 验收 · 2026-09-19
 

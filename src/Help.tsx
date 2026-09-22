@@ -1,71 +1,84 @@
 import { useState } from "react";
 import { getLocale } from "./i18n";
+
 const topics = [
   [
-    "金额快速计算",
-    "Quick amount calculation",
-    "金额输入框支持 +、-、*、/ 和括号，例如输入 12.5+8+6*2，界面会先显示计算结果，保存时只生成一笔交易。普通金额仍最多两位小数；除法等产生更多小数时，最终结果四舍五入到分。合并后无法分别分析每个组成金额，需要逐笔统计时请分别记账。",
-    "Amount fields support +, -, *, / and parentheses. For example, 12.5+8+6*2 shows a result before saving and creates one transaction. Plain amounts still allow at most two decimal places; calculations are rounded to cents only at the final result. Combined parts cannot be analyzed separately, so record separate transactions when you need item-level analysis.",
+    "快速开始",
+    "Quick start",
+    "首次使用先确认周期规则和账户期初余额，再设置主要工资、主要消费与主要储蓄账户。日常顺序通常是：记录工资收入 → 工资分配 → 记录支出或转账 → 查看预算与统计。软件不会连接银行，确认分配只是在账本中记录你已经实际完成的转账。",
+    "Confirm the period rule and opening balances first, then assign primary salary, spending, and savings accounts. A typical flow is: record salary, allocate it, record expenses or transfers, then review budgets and analytics. The app does not connect to banks; confirming an allocation records transfers you have actually completed.",
   ],
   [
-    "记账与保存",
-    "Recording & saving",
-    "填写实际日期、账户和金额，点击保存后写入本地SQLite。每笔交易只存一次；修改增加审计历史，不增加一笔收入。未点击保存的表单不算账。",
-    "Enter the actual date, account and amount, then Save to commit to local SQLite. Editing adds audit history, not duplicate income. Unsaved forms are not transactions.",
+    "金额与日期输入",
+    "Amounts & dates",
+    "金额输入框支持 +、-、*、/ 和括号，例如 12.5+8+6*2；保存时换算为整数分并只生成一条记录。普通金额最多两位小数。日期默认今天，可用日历选择，也可输入 YYYY-MM-DD、中文年月日、斜杠日期或八位数字。",
+    "Amount fields support +, -, *, / and parentheses, such as 12.5+8+6*2. The result is converted to integer cents and saved as one record. Plain amounts allow up to two decimals. Dates default to today and accept calendar selection, ISO, Chinese, slash, or eight-digit input.",
   ],
   [
-    "余额不足与预算超支",
-    "Balance protection & overspending",
-    "付款账户余额不足默认阻止支出或转账。先核对期初余额、日期和漏记收入；确需补录历史可在偏好设置允许负余额。预算超支只是超过计划，账户有足够资金仍能记账。",
-    "Insufficient funds block payments and transfers by default. Check opening balances, dates and missing income. Historical entry mode can allow negative balances. Exceeding a budget does not block a funded payment.",
+    "账户、余额与金额隐藏",
+    "Accounts, balances & privacy",
+    "账户可以动态新增、修改、归档和校准余额。校准会生成独立调整记录，不计收入、支出、预算或储蓄率。全局金额开关与页面/账户独立开关需同时允许才显示金额；隐藏仅影响界面，数据库与备份并未加密。",
+    "Accounts can be added, edited, archived, and balance-calibrated. Calibration creates an adjustment excluded from income, expenses, budgets, and savings rate. Both global and per-page/account visibility must allow an amount to be shown. Hiding is visual; the database and backups are not encrypted.",
   ],
   [
-    "待办、规则与完成历史",
-    "Bills, rules & completion history",
-    "总览可随时新增固定账单。每周或每月规则到期生成待办，实际支付后点击确认支付；也可关联已记支出、延期或跳过。未来规则不能提前伪记为支出。处理记录在设置的固定账单中查看。",
-    "Add recurring bills from Overview at any time. Weekly or monthly rules create due items. Confirm actual payment, link an existing expense, snooze or skip. Future rules are not expenses. Completed items remain in bill history.",
+    "预算、周期与安心支出",
+    "Budgets, periods & safe spending",
+    "预算可按工资周期或自然月管理，规则可立即、下周期或指定日期生效。安心支出取本期剩余预算与主要消费账户可用余额中的较小非负值，状态颜色同时参考预算空间和真实资金覆盖；预算超支不会自动阻止有资金的支出。",
+    "Budgets can follow salary periods or calendar months, with immediate, next-period, or specified-date changes. Safe spending is the smaller non-negative value of remaining budget and available funds in the primary spending account. Its state reflects both plan space and real cash coverage. Overspending does not block a funded expense.",
   ],
   [
-    "退款与理财收入",
-    "Refunds & investment income",
-    "从原支出发起退款，可按剩余可退金额选择全部、25%、50%、75%，或手填。退款冲减实际到账期支出。理财收入只记到账利息、分红或已实现收益；赎回本金、账户间本金转移不能计收入。",
-    "Start a refund from its original expense. Use the remaining refundable amount or 25/50/75 percent, or enter an amount. Refunds reduce spending in the receipt period. Investment income includes received interest, dividends and realized gains, not returned or transferred principal.",
+    "交易、退款与范围筛选",
+    "Transactions, refunds & filters",
+    "交易按实际发生日期保存一次。列表可组合日期、最低/最高金额、类型、账户、分类、搜索和排序。退款必须从原支出发起，可全额、按比例或自定义；列表在原支出上显示已退款金额或已全额退款，不把退款伪装成一笔新收入。",
+    "Each transaction is stored once by actual date. Combine date, amount, type, account, category, search, and sort filters. Start refunds from the original expense using full, percentage, or custom amounts. The original expense shows the refunded amount instead of presenting a new income.",
   ],
   [
-    "工资分配与预算周期",
-    "Salary allocation & budget periods",
-    "工资分配现在是独立一级页面。标记工资收入后，助手按剩余预算和主要消费账户余额计算补足额，并把余款安排到储蓄或理财；软件不会操作银行。预算可按工资周期或自然月管理，规则可立即、下周期或指定未来日期生效。",
-    "Salary allocation is a main page. After marking salary income, it uses remaining budget and the primary spending balance to calculate a top-up and direct the remainder to savings or investments. It never operates a bank. Budgets can use salary cycles or calendar months, with immediate, next-period or specified-date changes.",
+    "固定账单",
+    "Recurring bills",
+    "固定账单规则到期后生成待办，不会提前自动扣款。实际支付后可确认生成支出，也可关联已有支出、延期或跳过。修改影响未确认待办和未来计划；删除停止后续提醒并取消未确认待办，已支付历史与真实交易继续保留。",
+    "Recurring rules create due items without automatic payment. After paying, confirm a new expense or link an existing one; you can also snooze or skip. Edits affect unconfirmed and future items. Deletion stops reminders and cancels unconfirmed items while keeping paid history and transactions.",
   ],
   [
-    "待收款与归还",
-    "Receivables & repayments",
-    "待收款用于记录借给他人的临时资金。对方必填，预计归还日可选；可分次归还并选择回款账户。借出与归还只改变账户和待收余额，不计收入、支出、预算执行率或储蓄率。",
-    "Receivables track temporary lending. The person is required and the due date is optional. Partial repayments can use any destination account. Lending and repayment change account cash and the outstanding balance, but not income, spending, budgets, or the savings rate.",
+    "工资分配",
+    "Salary allocation",
+    "先把收入标记为工资，再进入工资分配。建议会参考预算缺口、主要消费账户余额、源账户保留金额和所选上限。超支或消费资金不足时可按完整预算、50%、固定金额或自定义金额补充；确认只生成内部转账，不重置预算，也不计收入或支出。",
+    "Mark income as salary before allocation. Suggestions use the budget gap, primary spending balance, retained source amount, and selected cap. When overspent or underfunded, top up by full budget, 50%, presets, or a custom amount. Confirmation creates internal transfers only; it does not reset budgets or count as income or expense.",
   ],
   [
-    "交易范围筛选",
-    "Transaction range filters",
-    "交易记录可同时使用快捷或自定义日期、最低/最高金额、类型、账户、分类、搜索和排序。日期结束值按所选当天完整包含，金额按绝对值筛选。",
-    "Transactions can combine quick or custom dates, minimum/maximum amounts, type, account, category, search, and sort. The selected end date is inclusive, and amount filters use absolute values.",
+    "待收款",
+    "Receivables",
+    "待收款记录借给谁、借出账户、可选归还日和备注，支持分次归还及选择实际回款账户。借出与归还只改变账户资金和待收余额，不计收支、预算或储蓄率。误录可确认撤销；关联流水一并撤销并恢复余额。",
+    "Receivables track the borrower, source account, optional due date, and note. Partial repayments can use any return account. Lending and repayment affect account cash and outstanding balance only. Mistakes can be cancelled with confirmation, reversing linked entries and balances.",
   ],
   [
-    "统计分析与空数据",
-    "Analytics & empty ranges",
-    "分析按交易实际发生日期统计，可快速查看今日、最近3天等范围。期初、校准、转账和待收款不会产生收支图。趋势只画截至今天的数据，可选柱状/折线、单独净支出及日期粒度；构成图可切换支出、收入、收入与净支出、当前周期预算和正余额账户，并可使用环形图或条形图。还可查看前一等长区间比较。退款可使净支出为负。",
-    "Analytics use actual transaction dates and include quick ranges such as today and the last three days. Opening balances, adjustments, transfers, and receivables do not create income or spending. Trends plot elapsed dates only. Choose bars or lines, net spending alone, and date grouping. Composition charts cover spending, income, income versus net spending, the selected period budget, and positive account balances in donut or bar form. Compare the preceding equal-length range. Refunds can make net spending negative.",
+    "存钱计划",
+    "Savings plans",
+    "先填写目标金额，再选择进度方式。“关联账户余额”表示把所选账户当前余额合计为计划进度，只读取余额，不移动资金、不创建交易；账户之间转账也不会重复累计。“手动维护进度”适合不对应具体账户的目标，直接填写目前已存金额。计划显示目前、还差和完成比例；删除计划不会删除账户或交易。",
+    "Enter a target, then choose a progress method. Linked account balances sum the current balances of selected accounts; this reads balances without moving money or creating transactions, and transfers between linked accounts are not double-counted. Manual progress suits goals without dedicated accounts. Plans show current, remaining, and completion percentage. Deleting a plan keeps accounts and transactions.",
   ],
   [
-    "数据目录、升级和备份",
-    "Data location, updates & backups",
-    "默认数据在Windows用户目录，可迁移到自选父目录下的SalaryFlow-data。迁移先验证快照，重启后切换，原目录保留；已有目标账本不覆盖。程序升级不复制交易，数据库结构升级前会留安全快照。自动备份按日/月轮换，不要把备份当缓存删掉。",
-    "Data default to the Windows user directory. Relocate to SalaryFlow-data under a chosen parent folder. A validated copy activates on restart; the original remains. Existing target ledgers are not overwritten. App updates do not duplicate transactions. Schema upgrades create safety snapshots; daily/monthly backups rotate. Backups are not cache.",
+    "统计分析",
+    "Analytics",
+    "统计按交易实际发生日期计算，可用今日、近3/7/30/90天、工资周期、周/月/年历史周期和自定义范围。可按全部账户或单一账户查看收入、净支出、构成和趋势；退款冲减原支出，期初、校准、转账和待收款不属于收支。图表与列表共用所选范围和账户。",
+    "Analytics use actual dates and support today, rolling ranges, salary periods, historical week/month/year periods, and custom dates. View income, net spending, composition, and trends for all or one account. Refunds reduce original expenses; openings, calibration, transfers, and receivables are excluded. Charts and lists share the selected range and account.",
   ],
   [
-    "删除、恢复与缓存",
-    "Deletion, recovery & cache",
-    "删除交易为软删除，回收站可恢复并重新校验关联。账户和分类归档保留历史。清理界面缓存不删除账本、审计或备份。恢复备份会整体替换账本，并先保存当前安全快照。备份和数据库未加密，隐藏金额只是视觉遮挡。",
-    "Transactions are soft-deleted and can be restored subject to consistency checks. Archiving preserves history. Clearing UI cache keeps the ledger, audit and backups. Restoring a backup replaces the ledger after a safety snapshot. Files are unencrypted; hiding amounts is visual only.",
+    "分类与历史口径",
+    "Categories & historical labels",
+    "分类名称和分组可修改，但历史交易保留发生时版本。完全未被交易、预算或固定账单使用的分类可以彻底删除；已有历史的分类只能归档，以免破坏旧账、统计和预算版本。",
+    "Category names and groups can be edited while historical transactions retain their original version. Unused categories can be deleted permanently. Categories referenced by transactions, budgets, or bills must be archived to preserve history and analytics.",
+  ],
+  [
+    "外观、语言与图表配色",
+    "Appearance, language & chart colors",
+    "可选择六套界面配色及浅色/深色模式，统计图表会使用与当前配色协调的色板，预算风险色仍按风险等级显示。界面可切换中文或English，切换只改变显示文字，不改写账户、分类和交易数据。",
+    "Choose from six palettes and light or dark mode. Analytics use a coordinated chart palette, while budget risk colors still follow risk levels. Switch between Chinese and English without rewriting account, category, or transaction data.",
+  ],
+  [
+    "数据、备份与重新开始",
+    "Data, backup & reset",
+    "数据保存在本地 SQLite，可迁移数据目录、导入导出并创建完整备份。恢复会先保存当前安全快照，再整体替换账本。清理界面缓存不删除财务数据；“重新开始/清空账本”会清除账本内容，应先备份。程序升级不复制交易，数据库迁移前会建立安全快照。",
+    "Data use local SQLite with relocation, import/export, and full backups. Restore creates a safety snapshot before replacing the ledger. Clearing UI cache keeps financial data, while reset clears the ledger and should follow a backup. Updates do not duplicate transactions, and migrations create safety snapshots.",
   ],
   [
     "关于作者",
@@ -76,10 +89,11 @@ const topics = [
   [
     "关于本程序",
     "About this application",
-    "薪流 SalaryFlow 0.9.2 是持续迭代的本地优先个人预算、现金流与资产管理产品，当前提供 Windows 桌面端和 Android 预览版，iOS 共用工程已搭建。各平台按屏幕与输入方式设计，并共享整数金额、交易、预算和统计口径。",
-    "SalaryFlow 0.9.2 is an evolving, local-first personal budgeting, cash-flow, and asset management product. Windows and Android are available today, while the shared iOS project is ready for macOS/Xcode packaging. All platforms use the same integer-money, transaction, budget, and analytics rules.",
+    "薪流 SalaryFlow 0.9.3 是持续迭代的本地优先个人预算、现金流、储蓄目标与资产管理产品。当前提供 Windows 桌面端与 Android 预览版，iOS 共用工程已搭建；各平台针对屏幕和输入方式优化，并沿用一致的财务口径。",
+    "SalaryFlow 0.9.3 is an evolving, local-first product for budgeting, cash flow, savings goals, and assets. Windows and an Android preview are available, and the shared iOS project is ready for macOS/Xcode packaging. All platforms follow consistent financial rules.",
   ],
 ];
+
 export function Help() {
   const [query, setQuery] = useState("");
   const en = getLocale() === "en";
@@ -93,30 +107,30 @@ export function Help() {
         onChange={(e) => setQuery(e.target.value)}
       />
       {topics
-        .filter((t) => t.join(" ").toLowerCase().includes(query.toLowerCase()))
-        .map((t) => (
-          <details key={t[0]} open={!!query}>
-            <summary>{t[en ? 1 : 0]}</summary>
-            <p>{t[en ? 3 : 2]}</p>
+        .filter((topic) =>
+          topic.join(" ").toLowerCase().includes(query.toLowerCase()),
+        )
+        .map((topic) => (
+          <details key={topic[0]} open={!!query}>
+            <summary>{topic[en ? 1 : 0]}</summary>
+            <p>{topic[en ? 3 : 2]}</p>
           </details>
         ))}
       {!query && (
         <details>
           <summary>
             {en
-              ? "Example: analytics (test ledger, Chinese interface)"
-              : "界面示例：统计分析（测试账本）"}
+              ? "Example: analytics (isolated test ledger)"
+              : "界面示例：统计分析（隔离测试账本）"}
           </summary>
           <p>
             {en
-              ? "A real capture of the isolated test ledger main content, without a duplicated sidebar. It is not your ledger. The chart, categories, and comparison share the selected date range."
-              : "以下为隔离测试账本的真实主内容区截图，不含重复侧栏，也不是你的真实账目。趋势、分类和前期比较共用所选日期范围。"}
+              ? "This is a real capture of the current isolated test ledger, not your data. Charts, categories, account filtering, and comparisons share the selected date range."
+              : "以下是当前版本隔离测试账本的真实截图，不含你的账目。图表、分类、账户筛选和前期比较共用所选日期范围。"}
           </p>
           <img
             src={new URL("./assets/manual-analysis.png", import.meta.url).href}
-            alt={
-              en ? "Analytics screen using example data" : "统计分析示例截图"
-            }
+            alt={en ? "Current analytics example" : "当前统计分析示例"}
           />
         </details>
       )}

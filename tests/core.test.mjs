@@ -338,3 +338,60 @@ test("未使用分类可删除，已有预算的分类只能归档", (t) => {
     /不能彻底删除/,
   );
 });
+
+test("存钱计划可关联多个账户或手动维护，转账不重复累计进度", (t) => {
+  const { store, salary, spending, savings } = fixture(t);
+  const linked = store.command("saveSavingsPlan", {
+    name: "应急金",
+    target_minor: "1000000",
+    mode: "ACCOUNTS",
+    account_ids: [spending.id, savings.id],
+    manual_minor: "0",
+  });
+  let plan = store.snapshot().savingsPlans.find((item) => item.id === linked.id);
+  assert.equal(plan.current_minor, "370000");
+  assert.equal(plan.remaining_minor, "630000");
+  store.command("record", {
+    kind: "TRANSFER",
+    amount_minor: "10000",
+    date: "2026-09-15",
+    source_id: spending.id,
+    destination_id: savings.id,
+  });
+  plan = store.snapshot().savingsPlans.find((item) => item.id === linked.id);
+  assert.equal(plan.current_minor, "370000");
+  const manual = store.command("saveSavingsPlan", {
+    name: "旅行",
+    target_minor: "500000",
+    mode: "MANUAL",
+    manual_minor: "120000",
+    account_ids: [],
+  });
+  const manualPlan = store.snapshot().savingsPlans.find((item) => item.id === manual.id);
+  assert.equal(manualPlan.current_minor, "120000");
+  store.command("deleteSavingsPlan", { id: manual.id });
+  assert.equal(store.snapshot().savingsPlans.some((item) => item.id === manual.id), false);
+});
+
+test("工资分配超支补齐方案只改变转账目标，不改预算统计", (t) => {
+  const { store, salary, spending, savings, record } = fixture(t);
+  record("INCOME", 1000000, { salary: true });
+  const salaryTx = store.snapshot().salaryIncomes[0];
+  const full = store.allocationQuote({
+    salary_id: salaryTx.id,
+    spending_id: spending.id,
+    savings_id: savings.id,
+    reserve_minor: "0",
+    limit_mode: "SOURCE_BALANCE",
+    topup_mode: "FULL",
+  });
+  assert.equal(full.topup_mode, "FULL");
+  assert.equal(BigInt(full.topup) <= BigInt(full.available), true);
+  const before = store.snapshot().totalBudget;
+  const half = store.allocationQuote({
+    ...full.input,
+    topup_mode: "HALF",
+  });
+  assert.equal(half.topup_mode, "HALF");
+  assert.equal(store.snapshot().totalBudget, before);
+});

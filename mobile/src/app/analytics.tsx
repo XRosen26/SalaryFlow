@@ -113,6 +113,7 @@ export default function AnalyticsScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [data, setData] = useState<AnalyticsSnapshot | null>(null);
+  const [accountId, setAccountId] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [periodUnit, setPeriodUnit] = useState<CalendarPeriodUnit>("week");
   const [periodChoice, setPeriodChoice] = useState<CalendarPeriodOption | null>(
@@ -169,7 +170,7 @@ export default function AnalyticsScreen() {
     if (!dates) return;
     setData(null);
     setLoadError(null);
-    loadAnalytics(db, dates.start, dates.end)
+    loadAnalytics(db, dates.start, dates.end, accountId || undefined)
       .then(setData)
       .catch((reason) =>
         setLoadError(reason instanceof Error ? reason.message : "统计失败"),
@@ -387,6 +388,19 @@ export default function AnalyticsScreen() {
           </Pressable>
         </Card>
       ) : null}
+
+      <Card style={styles.rangeCard}>
+        <Text style={[styles.rangeTitle, { color: colors.text }]}>统计账户</Text>
+        <Text style={[styles.muted, { color: colors.textSecondary }]}>
+          选择账户后，收入按入账账户、支出按付款账户、退款按退回账户统计。
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.accountChips}>
+          <Chip label="全部账户" active={!accountId} onPress={() => setAccountId("")} />
+          {snapshot.accounts.map((account) => (
+            <Chip key={account.id} label={account.name} active={accountId === account.id} onPress={() => setAccountId(account.id)} />
+          ))}
+        </ScrollView>
+      </Card>
 
       <Modal
         visible={periodOpen}
@@ -812,9 +826,13 @@ export default function AnalyticsScreen() {
           ))}
         </View>
         {dailyRows.length ? (
-          <View style={styles.bars}>
+          <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.bars}>
             {dailyRows.map((item) => (
-              <View key={item.date} style={styles.day}>
+              <Pressable
+                key={item.date}
+                style={styles.day}
+                onPress={() => setSelectedId("trend-" + item.date)}
+              >
                 <Text
                   numberOfLines={1}
                   style={[styles.barValue, { color: colors.textSecondary }]}
@@ -854,9 +872,14 @@ export default function AnalyticsScreen() {
                 <Text style={[styles.dayText, { color: colors.textSecondary }]}>
                   {item.date.slice(5)}
                 </Text>
-              </View>
+                {selectedId === "trend-" + item.date ? (
+                  <Text style={[styles.trendDetail, { color: colors.text }]}>
+                    {hidden ? "金额已隐藏" : `收 ${compactMoney(item.incomeMinor)} · 支 ${compactMoney(Math.max(0, item.expenseMinor))}`}
+                  </Text>
+                ) : null}
+              </Pressable>
             ))}
-          </View>
+          </ScrollView>
         ) : (
           <Text style={[styles.empty, { color: colors.textSecondary }]}>
             此范围暂无收支记录
@@ -1032,8 +1055,8 @@ const styles = StyleSheet.create({
     width: 3,
     borderRadius: 2,
   },
-  bars: { height: 150, flexDirection: "row", alignItems: "flex-end", gap: 4 },
-  day: { flex: 1, alignItems: "center", gap: 4 },
+  bars: { minHeight: 178, flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 4 },
+  day: { width: 58, alignItems: "center", gap: 4 },
   barPair: {
     height: 100,
     flexDirection: "row",
@@ -1042,7 +1065,9 @@ const styles = StyleSheet.create({
   },
   bar: { width: 5, borderRadius: 3 },
   barValue: { width: 36, fontSize: 8, textAlign: "center" },
-  dayText: { fontSize: 8, transform: [{ rotate: "-45deg" }] },
+  dayText: { fontSize: 10, transform: [{ rotate: "-35deg" }], marginTop: 3 },
+  trendDetail: { fontSize: 8, fontWeight: "800", textAlign: "center", width: 58 },
+  accountChips: { gap: spacing.sm, paddingRight: spacing.md },
   groupBlock: { borderTopWidth: StyleSheet.hairlineWidth },
   groupHeader: {
     minHeight: 64,

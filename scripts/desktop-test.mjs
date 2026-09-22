@@ -134,6 +134,7 @@ try {
     ["工资分配", "05-allocation"],
     ["我的账户", "06-accounts"],
     ["待收款", "06-receivables"],
+    ["存钱计划", "06-savings"],
     ["统计分析", "07-analysis"],
     ["帮助与使用手册", "08-help"],
     ["设置与数据", "09-settings"],
@@ -206,6 +207,30 @@ try {
         .getByRole("button", { name: "确认借出", exact: true })
         .click();
       await page.getByText("桌面验收联系人", { exact: true }).waitFor();
+    }
+    if (name === "存钱计划") {
+      await page.getByRole("button", { name: "新建计划", exact: true }).click();
+      const savingsDialog = page.getByRole("dialog");
+      await savingsDialog.getByLabel("计划名称").fill("桌面验收储蓄目标");
+      await savingsDialog.getByLabel("目标金额（元）").fill("10000.50");
+      await savingsDialog
+        .locator("label")
+        .filter({ hasText: "长期储蓄" })
+        .getByRole("checkbox")
+        .check();
+      await savingsDialog
+        .getByRole("button", { name: "保存", exact: true })
+        .click();
+      await savingsDialog.waitFor({ state: "hidden" });
+      await page.getByText("桌面验收储蓄目标", { exact: true }).waitFor();
+      const savingsSnapshot = await page.evaluate(() =>
+        window.salaryflow.invoke("snapshot", {}),
+      );
+      const savedPlan = savingsSnapshot.data.savingsPlans.find(
+        (plan) => plan.name === "桌面验收储蓄目标",
+      );
+      assert.equal(savedPlan.target_minor, "1000050");
+      assert(savedPlan.account_names.includes("长期储蓄"));
     }
     if (name === "帮助与使用手册") {
       await page

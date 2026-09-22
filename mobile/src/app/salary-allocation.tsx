@@ -96,6 +96,8 @@ export default function SalaryAllocationScreen() {
         need,
         toSpending,
         toSavings: available - toSpending,
+        budgetMinor: snapshot.summary.budgetMinor,
+        overspent: snapshot.summary.remainingBudgetMinor < 0,
         error: "",
       };
     } catch (reason) {
@@ -106,6 +108,8 @@ export default function SalaryAllocationScreen() {
         need: 0,
         toSpending: 0,
         toSavings: 0,
+        budgetMinor: snapshot?.summary.budgetMinor ?? 0,
+        overspent: (snapshot?.summary.remainingBudgetMinor ?? 0) < 0,
         error: reason instanceof Error ? reason.message : "请检查分配金额",
       };
     }
@@ -142,6 +146,21 @@ export default function SalaryAllocationScreen() {
       Alert.alert("无法计算", e instanceof Error ? e.message : "请检查输入");
     }
   };
+  const applyTopUp = (kind: "FULL" | "HALF" | "ADD300" | "ADD500") => {
+    if (!basis) return;
+    const desired =
+      kind === "FULL"
+        ? Math.max(0, basis.budgetMinor - spending.balanceMinor)
+        : kind === "HALF"
+          ? Math.max(0, Math.round(basis.budgetMinor * 0.5) - spending.balanceMinor)
+          : kind === "ADD300"
+            ? 30000
+            : 50000;
+    const amount = Math.min(basis.available, desired);
+    setSpendingText((amount / 100).toFixed(2));
+    setSavingsText(((basis.available - amount) / 100).toFixed(2));
+  };
+
   const execute = () => {
     try {
       const spendingMinor = Number(
@@ -285,7 +304,22 @@ export default function SalaryAllocationScreen() {
           />
           <Row label="建议补充消费账户" value={basis.toSpending} />
           <Row label="建议转入储蓄账户" value={basis.toSavings} />
+          {basis.overspent || spending.balanceMinor < basis.budgetMinor ? (
+            <Card style={[styles.warning, { backgroundColor: c.primarySoft, borderColor: c.border }]}>
+              <Text style={[styles.warningTitle, { color: c.text }]}>本期超支或消费资金不足</Text>
+              <Text style={[styles.help, { color: c.textSecondary }]}>
+                本期超支了哦，建议更新预算或者减少非必要开支。下面只补充消费账户资金，不会重置预算，也不会计作收入或支出。
+              </Text>
+              <View style={styles.wrap}>
+                <Choice label="补齐至完整预算" active={false} onPress={() => applyTopUp("FULL")} />
+                <Choice label="补齐至50%" active={false} onPress={() => applyTopUp("HALF")} />
+                <Choice label="+300" active={false} onPress={() => applyTopUp("ADD300")} />
+                <Choice label="+500" active={false} onPress={() => applyTopUp("ADD500")} />
+              </View>
+            </Card>
+          ) : null}
           <Text style={[styles.title, { color: c.text }]}>确认前可调整</Text>
+          <Text style={[styles.help, { color: c.textSecondary }]}>可直接输入其他金额；总分配不得超过工资账户可用资金。</Text>
           <TextInput
             value={spendingText}
             onChangeText={setSpendingText}
@@ -351,6 +385,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   saveText: { color: "#fff", fontWeight: "900" },
+  warning: { gap: spacing.sm, borderWidth: 1 },
+  warningTitle: { fontSize: 14, fontWeight: "900" },
   between: {
     flexDirection: "row",
     justifyContent: "space-between",
