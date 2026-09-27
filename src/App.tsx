@@ -4136,6 +4136,8 @@ export default function App() {
                         ["amber", "暖琥珀", "Amber", "#99621e"],
                         ["rose", "玫瑰", "Rose", "#a4476c"],
                         ["slate", "石墨", "Slate", "#546775"],
+                        ["coral", "珊瑚", "Coral", "#A95543"],
+                        ["indigo", "靛青", "Indigo", "#444E9E"],
                       ].map(([key, zh, en, color]) => (
                         <button
                           key={key}
@@ -4314,7 +4316,7 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.9.3 · Windows 与移动端本地个人预算、现金流、储蓄目标和资产管理",
+                          "SalaryFlow 0.9.4 · Windows 与移动端本地个人预算、现金流、储蓄目标和资产管理",
                         )}
                       </p>
                       <p>

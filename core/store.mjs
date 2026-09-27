@@ -1516,7 +1516,7 @@ export class Store {
   saveSettings(p) {
     const old = this.settings();
     ensure(
-      ["forest", "ocean", "violet", "amber", "rose", "slate"].includes(
+      ["forest", "ocean", "violet", "amber", "rose", "slate", "coral", "indigo"].includes(
         p.palette ?? old.palette ?? "forest",
       ),
       "配色选项无效",

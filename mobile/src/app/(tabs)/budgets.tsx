@@ -73,7 +73,7 @@ export default function BudgetsScreen() {
       />
       <Card style={styles.summary}>
         <View style={styles.summaryTop}>
-          <View>
+          <View style={styles.summaryAmount}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>
               本期剩余预算
             </Text>
@@ -208,10 +208,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: spacing.sm,
   },
+  summaryAmount: { flex: 1, minWidth: 0 },
   label: { fontSize: 13, marginBottom: spacing.sm },
   facts: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     gap: spacing.md,
   },

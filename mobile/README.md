@@ -4,13 +4,13 @@
 
 ## 当前版本
 
-- **0.6.2 预览版**
+- **0.6.4 预览版**
 - Android 7（API 24）及以上，target/compileSdk 36；ARM64 APK 位于 `release/`
 - iOS Bundle ID 为 `com.xrosen26.salaryflow`；Expo iOS bundle 已验证，原生 IPA 需 macOS/Xcode
 - Expo SDK 57、React Native 0.86、TypeScript、Expo Router、Expo SQLite
-- 数据仅保存在应用本地；六套配色，可跟随系统或固定浅色/深色
+- 数据仅保存在应用本地；八套配色，可跟随系统或固定浅色/深色
 - 中文系统启动器显示“薪流”，其他语言环境显示“SalaryFlow”
-- 当前 APK SHA-256：`1D95450108E7BDA8B69E2D2FE55CCCBB133A4E3630D3D071B16A7376FC09BAE5`；完整清单见 Release 的 `SHA256SUMS.txt`。
+- 当前 APK SHA-256 见 Release 的 `SHA256SUMS.txt`。
 
 ## 移动端重点
 

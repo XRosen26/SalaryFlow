@@ -1,4 +1,13 @@
-# 验证记录 · Windows 0.9.3 / Android 0.6.3
+# 验证记录 · Windows 0.9.4 / Android 0.6.4
+
+## Windows 0.9.4 / Android 0.6.4 验收 · 2026-09-27
+
+Windows：66项Node测试、TypeScript/Vite生产构建、源码Electron桌面流程及最终解包程序桌面流程通过。桌面回归在820像素窗口以200万元目标检查存钱计划三个金额均留在卡片边界内；同时检查八套配色可选择和保存。最终打包程序通过相同的隔离账本流程。安装版和便携版均未使用公开代码签名证书（Authenticode: NotSigned）。
+
+Android：TypeScript检查和12项领域/数据库测试通过；ARM64 Release完成576项Gradle任务，Lint Vital、Dex、资源优化与打包通过。APK确认versionName 0.6.4、versionCode 11、minSdk 24、target/compileSdk 36，仅含arm64-v8a；APK V2签名验证通过。权限为震动和应用内部接收器权限，没有网络或外部存储权限。移动端大额存钱金额改成全宽逐行布局，相关账户、预算、统计区域增加窄屏容纳空间；这部分未连接真机做视觉验证。
+
+发布安全：Windows ASAR共4059个条目，Android APK共1235个条目；包内清单和Git跟踪清单均未发现SQLite账本、数据库、备份或用户路径。SHA-256：安装版 `0E48F5AA14983A068B8F81CF0603D4A4B48B98B5D98C0A176E2D71B0D1139A65`；便携版 `EBEE22971071723FB78E0591D26E89FED203B74FC315E6DE42BCFCECD650A86A`；Android APK `42D738CE3FCD459658B8732CF46F8C2870D9BDD6846796240D8C31728AB3982A`。本次未连接真实Android/iOS设备；Android包使用开发预览签名，适合安装测试，正式应用市场发布仍需正式签名和上架验收。iOS保留同源工程的0.6.4、buildNumber 11配置，Windows本次不提供IPA。
+
 
 ## Windows 0.9.3 / Android 0.6.3 验收 · 2026-09-22
 

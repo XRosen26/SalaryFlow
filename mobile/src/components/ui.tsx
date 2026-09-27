@@ -331,6 +331,7 @@ const styles = StyleSheet.create({
   },
   iconButtonLabel: { fontSize: 13, fontWeight: "700" },
   money: {
+    flexShrink: 1,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
     letterSpacing: -0.6,

@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 12, fontWeight: "800" },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  metric: { flexGrow: 1, minWidth: 105, gap: spacing.sm },
+  metric: { flexGrow: 1, minWidth: 190, gap: spacing.sm },
   muted: { fontSize: 12, lineHeight: 18 },
   big: { fontSize: 20, fontWeight: "900" },
   card: { gap: spacing.lg },

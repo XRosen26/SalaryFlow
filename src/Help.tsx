@@ -71,8 +71,8 @@ const topics = [
   [
     "外观、语言与图表配色",
     "Appearance, language & chart colors",
-    "可选择六套界面配色及浅色/深色模式，统计图表会使用与当前配色协调的色板，预算风险色仍按风险等级显示。界面可切换中文或English，切换只改变显示文字，不改写账户、分类和交易数据。",
-    "Choose from six palettes and light or dark mode. Analytics use a coordinated chart palette, while budget risk colors still follow risk levels. Switch between Chinese and English without rewriting account, category, or transaction data.",
+    "可选择八套界面配色及浅色/深色模式，统计图表会使用与当前配色协调的色板，预算风险色仍按风险等级显示。界面可切换中文或English，切换只改变显示文字，不改写账户、分类和交易数据。",
+    "Choose from eight palettes and light or dark mode. Analytics use a coordinated chart palette, while budget risk colors still follow risk levels. Switch between Chinese and English without rewriting account, category, or transaction data.",
   ],
   [
     "数据、备份与重新开始",
@@ -89,8 +89,8 @@ const topics = [
   [
     "关于本程序",
     "About this application",
-    "薪流 SalaryFlow 0.9.3 是持续迭代的本地优先个人预算、现金流、储蓄目标与资产管理产品。当前提供 Windows 桌面端与 Android 预览版，iOS 共用工程已搭建；各平台针对屏幕和输入方式优化，并沿用一致的财务口径。",
-    "SalaryFlow 0.9.3 is an evolving, local-first product for budgeting, cash flow, savings goals, and assets. Windows and an Android preview are available, and the shared iOS project is ready for macOS/Xcode packaging. All platforms follow consistent financial rules.",
+    "薪流 SalaryFlow 0.9.4 是持续迭代的本地优先个人预算、现金流、储蓄目标与资产管理产品。当前提供 Windows 桌面端与 Android 预览版，iOS 共用工程已搭建；各平台针对屏幕和输入方式优化，并沿用一致的财务口径。",
+    "SalaryFlow 0.9.4 is an evolving, local-first product for budgeting, cash flow, savings goals, and assets. Windows and an Android preview are available, and the shared iOS project is ready for macOS/Xcode packaging. All platforms follow consistent financial rules.",
   ],
 ];
 

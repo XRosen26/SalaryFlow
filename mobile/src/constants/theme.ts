@@ -7,7 +7,7 @@ import {
 import { useColorScheme } from "react-native";
 
 export type PaletteName =
-  "forest" | "ocean" | "violet" | "amber" | "rose" | "slate";
+  "forest" | "ocean" | "violet" | "amber" | "rose" | "slate" | "coral" | "indigo";
 
 export type AppColors = {
   background: string;
@@ -317,6 +317,61 @@ export const palettes: Record<PaletteName, PalettePair> = {
         "#B9ADD3",
         "#A6C2AA",
       ],
+    },
+  },
+
+  coral: {
+    light: {
+      ...sharedLight,
+      background: "#FBF6F2",
+      surfaceMuted: "#F6EBE4",
+      primary: "#A95543",
+      primaryPressed: "#894436",
+      primarySoft: "#F4E1D8",
+      border: "#ECDDD4",
+      income: "#2A786B",
+      info: "#315E9A",
+      chart: ["#A95543", "#C57151", "#D68A59", "#E1A76D", "#799B86", "#468B8A", "#667CAC", "#9971A5"],
+    },
+    dark: {
+      ...sharedDark,
+      background: "#1C1715",
+      surface: "#29201D",
+      surfaceMuted: "#3B2B26",
+      primary: "#B85F4C",
+      primaryPressed: "#D27761",
+      primarySoft: "#4B3029",
+      border: "#63443A",
+      income: "#79C2AB",
+      info: "#9ABCF1",
+      chart: ["#E5927D", "#EDAA85", "#EEC398", "#D7C987", "#97C5A6", "#7DBFC0", "#A4B6E4", "#C4A3D7"],
+    },
+  },
+  indigo: {
+    light: {
+      ...sharedLight,
+      background: "#F4F5FB",
+      surfaceMuted: "#E9EBF6",
+      primary: "#444E9E",
+      primaryPressed: "#354182",
+      primarySoft: "#E1E5F5",
+      border: "#DAE0F0",
+      income: "#287F78",
+      info: "#4D69A0",
+      chart: ["#444E9E", "#6063AD", "#7C70BD", "#987FC1", "#477BAA", "#4E9B9A", "#9D9B63", "#C5797B"],
+    },
+    dark: {
+      ...sharedDark,
+      background: "#131725",
+      surface: "#1E2334",
+      surfaceMuted: "#2B3246",
+      primary: "#666AC4",
+      primaryPressed: "#8184DA",
+      primarySoft: "#2E335B",
+      border: "#3B4560",
+      income: "#75C3B7",
+      info: "#9ABAF0",
+      chart: ["#A4A7EE", "#BCABEF", "#D1B0EC", "#E0B9DD", "#8BB9E4", "#88D1CC", "#CED28E", "#EBADA8"],
     },
   },
 };

@@ -61,7 +61,7 @@ test("饼图仅正数入图，其他合并保留合计和精确分值", () => {
   );
   assert.equal(pieData([{ amount: "0" }, { amount: "-10" }]).total, 0n);
 });
-test("五种新增配色持久化、独立于明暗模式、不改变财务数据", (t) => {
+test("七种可选配色持久化、独立于明暗模式、不改变财务数据", (t) => {
   const dir = fs.mkdtempSync(path.resolve(".local/palette04-"));
   const s = new Store(path.join(dir, "ledger.sqlite"));
   t.after(() => s.close());
@@ -72,7 +72,7 @@ test("五种新增配色持久化、独立于明暗模式、不改变财务数�
       { name: "测试卡", opening_minor: "123456", roles: ["SPENDING"] },
     ],
   });
-  for (const palette of ["ocean", "violet", "amber", "rose", "slate"]) {
+  for (const palette of ["ocean", "violet", "amber", "rose", "slate", "coral", "indigo"]) {
     s.command("saveSettings", { palette });
     s.command("saveSettings", { theme: "dark" });
     assert.equal(s.settings().palette, palette);
@@ -83,7 +83,7 @@ test("五种新增配色持久化、独立于明暗模式、不改变财务数�
     /配色/,
   );
   const other = new Store(path.join(dir, "ledger.sqlite"));
-  assert.equal(other.settings().palette, "slate");
+  assert.equal(other.settings().palette, "indigo");
   other.close();
 });
 

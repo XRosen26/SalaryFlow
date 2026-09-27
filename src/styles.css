@@ -3599,3 +3599,97 @@ th {
 .allocation-warning p { margin: 0; color: var(--text-secondary); }
 .custom-topup { display: flex; gap: 8px; max-width: 420px; }
 .custom-topup input { flex: 1; min-width: 0; }
+
+
+/* Additional calm palettes; budget risk tones remain independent. */
+:root[data-palette="coral"] {
+  --accent: #a95543;
+  --accent-hover: #894436;
+  --bg: #fbf6f2;
+  --soft: #f6ebe4;
+  --chart-1: #a95543;
+  --chart-2: #c57151;
+  --chart-3: #d68a59;
+  --chart-4: #e1a76d;
+  --chart-5: #799b86;
+  --chart-6: #468b8a;
+  --chart-7: #667cac;
+  --chart-8: #9971a5;
+}
+:root[data-palette="indigo"] {
+  --accent: #444e9e;
+  --accent-hover: #354182;
+  --bg: #f4f5fb;
+  --soft: #e9ebf6;
+  --chart-1: #444e9e;
+  --chart-2: #6063ad;
+  --chart-3: #7c70bd;
+  --chart-4: #987fc1;
+  --chart-5: #477baa;
+  --chart-6: #4e9b9a;
+  --chart-7: #9d9b63;
+  --chart-8: #c5797b;
+}
+:root[data-theme="dark"][data-palette="coral"] {
+  --bg: #1c1715;
+  --surface: #29201d;
+  --soft: #3b2b26;
+  --border: #63443a;
+  --accent: #b85f4c;
+  --accent-hover: #ce725f;
+  --chart-1: #e5927d;
+  --chart-2: #edaa85;
+  --chart-3: #eec398;
+  --chart-4: #d7c987;
+  --chart-5: #97c5a6;
+  --chart-6: #7dbfc0;
+  --chart-7: #a4b6e4;
+  --chart-8: #c4a3d7;
+}
+:root[data-theme="dark"][data-palette="indigo"] {
+  --bg: #131725;
+  --surface: #1e2334;
+  --soft: #2b3246;
+  --border: #3b4560;
+  --accent: #666ac4;
+  --accent-hover: #7b7fda;
+  --chart-1: #a4a7ee;
+  --chart-2: #bcabef;
+  --chart-3: #d1b0ec;
+  --chart-4: #e0b9dd;
+  --chart-5: #8bb9e4;
+  --chart-6: #88d1cc;
+  --chart-7: #ced28e;
+  --chart-8: #ebada8;
+}
+:root[data-palette="coral"] .chart-stroke-1,
+:root[data-palette="indigo"] .chart-stroke-1 { fill: var(--chart-1); }
+:root[data-palette="coral"] .chart-stroke-2,
+:root[data-palette="indigo"] .chart-stroke-2 { fill: var(--chart-2); }
+:root[data-palette="coral"] .chart-stroke-3,
+:root[data-palette="indigo"] .chart-stroke-3 { fill: var(--chart-3); }
+:root[data-palette="coral"] .chart-stroke-4,
+:root[data-palette="indigo"] .chart-stroke-4 { fill: var(--chart-4); }
+:root[data-palette="coral"] .chart-stroke-5,
+:root[data-palette="indigo"] .chart-stroke-5 { fill: var(--chart-5); }
+:root[data-palette="coral"] .chart-stroke-6,
+:root[data-palette="indigo"] .chart-stroke-6 { fill: var(--chart-6); }
+:root[data-palette="coral"] .chart-stroke-7,
+:root[data-palette="indigo"] .chart-stroke-7 { fill: var(--chart-7); }
+:root[data-palette="coral"] .chart-stroke-8,
+:root[data-palette="indigo"] .chart-stroke-8 { fill: var(--chart-8); }
+
+/* Let large balances use the available width without covering neighbors. */
+.savings-plan-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+.savings-plan-card, .savings-plan-head > div { min-width: 0; }
+.savings-plan-head h3, .savings-plan-head small, .savings-plan-card > p { overflow-wrap: anywhere; }
+.savings-plan-head > strong { color: var(--accent); flex-shrink: 0; }
+.savings-progress > span { background: var(--accent); }
+.savings-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.savings-figures > div { min-width: 0; }
+.savings-figures b { overflow-wrap: anywhere; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.summary-card, .stat-strip > div, .account-card, .asset-total { min-width: 0; }
+.summary-card h2, .medium-number, .stat-strip strong, .asset-total strong, .account-balance {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}

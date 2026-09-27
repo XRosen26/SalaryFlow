@@ -91,6 +91,8 @@ const paletteOptions: {
   { id: "amber", name: "暖琥珀", description: "温暖克制", color: "#99621E" },
   { id: "rose", name: "玫瑰", description: "温润明快", color: "#A4476C" },
   { id: "slate", name: "石墨", description: "低调中性", color: "#546775" },
+  { id: "coral", name: "珊瑚", description: "柔暖清爽", color: "#A95543" },
+  { id: "indigo", name: "靛青", description: "深邃沉稳", color: "#444E9E" },
 ];
 
 const themeModeOptions: {

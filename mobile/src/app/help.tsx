@@ -57,7 +57,7 @@ const topics = [
   ],
   [
     "外观与金额隐私",
-    "设置中可选择六套配色，并跟随系统或固定浅色/深色。统计图表随配色协调变化，预算风险色保持独立。关闭全局金额显示后，首页、明细、预算、存钱计划和账户金额都会遮挡。",
+    "设置中可选择八套配色，并跟随系统或固定浅色/深色。统计图表随配色协调变化，预算风险色保持独立。关闭全局金额显示后，首页、明细、预算、存钱计划和账户金额都会遮挡。",
   ],
   [
     "数据、备份与清空",
@@ -166,7 +166,7 @@ export default function HelpScreen() {
             薪流 SalaryFlow
           </Text>
           <Text style={[styles.version, { color: colors.primary }]}>
-            移动端 0.6.3
+            移动端 0.6.4
           </Text>
           <Text style={[styles.aboutBody, { color: colors.textSecondary }]}>
             薪流是一款本地优先的个人预算、现金流与资产管理应用，由 XRosen26

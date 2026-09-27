@@ -52,7 +52,7 @@ export default function AccountsScreen() {
       />
       <Card style={styles.total}>
         <View style={styles.totalTop}>
-          <View>
+          <View style={styles.totalAmount}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>
               全部账户总资产
             </Text>
@@ -228,7 +228,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: spacing.sm,
   },
+  totalAmount: { flex: 1, minWidth: 0 },
   label: { fontSize: 13, marginBottom: spacing.sm },
   totalActions: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   hint: { fontSize: 12, lineHeight: 18 },

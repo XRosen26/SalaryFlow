@@ -231,6 +231,26 @@ try {
       );
       assert.equal(savedPlan.target_minor, "1000050");
       assert(savedPlan.account_names.includes("长期储蓄"));
+      const planCard = page.locator(".savings-plan-card").filter({
+        hasText: "桌面验收储蓄目标",
+      });
+      await planCard.getByRole("button", { name: "修改", exact: true }).click();
+      const largePlanDialog = page.getByRole("dialog");
+      await largePlanDialog.getByLabel("目标金额（元）").fill("2000000.00");
+      await largePlanDialog.getByRole("button", { name: "保存", exact: true }).click();
+      await largePlanDialog.waitFor({ state: "hidden" });
+      await page.setViewportSize({ width: 820, height: 700 });
+      const bounds = await planCard.evaluate((card) => {
+        const panel = card.getBoundingClientRect();
+        return [...card.querySelectorAll(".savings-figures b")].map((node) => {
+          const amount = node.getBoundingClientRect();
+          return { left: amount.left, right: amount.right, panelLeft: panel.left, panelRight: panel.right };
+        });
+      });
+      assert(bounds.every(({ left, right, panelLeft, panelRight }) =>
+        left >= panelLeft - 1 && right <= panelRight + 1
+      ), "大额存钱目标超出卡片边界");
+      await page.setViewportSize({ width: 1280, height: 800 });
     }
     if (name === "帮助与使用手册") {
       await page
@@ -286,6 +306,8 @@ try {
         "amber",
         "rose",
         "slate",
+        "coral",
+        "indigo",
       ]) {
         const rendered = await page.evaluate((nextPalette) => {
           document.documentElement.dataset.palette = nextPalette;
@@ -309,8 +331,8 @@ try {
       }
       assert.equal(
         new Set(paletteStrokes).size,
-        6,
-        "六套界面配色没有实时产生六种圆环主色",
+        8,
+        "八套界面配色没有实时产生八种圆环主色",
       );
       const forestDark = await page.evaluate(() => {
         document.documentElement.dataset.palette = "forest";
@@ -470,7 +492,7 @@ try {
           "待收款创建与统计隔离",
           "趋势金额与环形占比直接标签",
           "周期预算环形图和条形图",
-          "六套配色与浅深主题实时更新圆环色板",
+          "八套配色与浅深主题实时更新圆环色板",
           "收入与净支出构成维度",
           "从首次记账日期生成的周月年快捷周期",
         ],

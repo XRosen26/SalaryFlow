@@ -18,7 +18,7 @@ export type Settings = {
   payday: number;
   amountsVisible: boolean;
   accountSummaryVisible: boolean;
-  palette: "forest" | "ocean" | "violet" | "amber" | "rose" | "slate";
+  palette: "forest" | "ocean" | "violet" | "amber" | "rose" | "slate" | "coral" | "indigo";
   themeMode: "system" | "light" | "dark";
   onboardingComplete: boolean;
 };

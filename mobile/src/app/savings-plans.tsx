@@ -207,7 +207,7 @@ export default function SavingsPlansScreen() {
                 />
               </View>
               <View style={styles.figures}>
-                <View>
+                <View style={styles.figure}>
                   <Text
                     style={[styles.caption, { color: colors.textSecondary }]}
                   >
@@ -217,9 +217,10 @@ export default function SavingsPlansScreen() {
                     value={plan.currentMinor}
                     hidden={hidden}
                     size={18}
+                    style={styles.figureAmount}
                   />
                 </View>
-                <View>
+                <View style={styles.figure}>
                   <Text
                     style={[styles.caption, { color: colors.textSecondary }]}
                   >
@@ -229,9 +230,10 @@ export default function SavingsPlansScreen() {
                     value={plan.remainingMinor}
                     hidden={hidden}
                     size={18}
+                    style={styles.figureAmount}
                   />
                 </View>
-                <View>
+                <View style={styles.figure}>
                   <Text
                     style={[styles.caption, { color: colors.textSecondary }]}
                   >
@@ -241,6 +243,7 @@ export default function SavingsPlansScreen() {
                     value={plan.targetMinor}
                     hidden={hidden}
                     size={18}
+                    style={styles.figureAmount}
                   />
                 </View>
               </View>
@@ -514,10 +517,16 @@ const styles = StyleSheet.create({
   track: { height: 10, borderRadius: 5, overflow: "hidden" },
   fill: { height: 10, borderRadius: 5 },
   figures: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     gap: spacing.sm,
   },
+  figure: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    minWidth: 0,
+  },
+  figureAmount: { flexShrink: 1, textAlign: "right" },
   caption: { fontSize: 11, marginBottom: 4 },
   encourage: { fontSize: 13, fontWeight: "800" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
