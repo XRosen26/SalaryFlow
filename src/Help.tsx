@@ -89,8 +89,8 @@ const topics = [
   [
     "关于本程序",
     "About this application",
-    "薪流 SalaryFlow 0.9.4 是持续迭代的本地优先个人预算、现金流、储蓄目标与资产管理产品。当前提供 Windows 桌面端与 Android 预览版，iOS 共用工程已搭建；各平台针对屏幕和输入方式优化，并沿用一致的财务口径。",
-    "SalaryFlow 0.9.4 is an evolving, local-first product for budgeting, cash flow, savings goals, and assets. Windows and an Android preview are available, and the shared iOS project is ready for macOS/Xcode packaging. All platforms follow consistent financial rules.",
+    "薪流 SalaryFlow 0.9.5 是持续迭代的本地优先个人预算、现金流、储蓄目标与资产管理产品。当前提供 Windows 桌面端与 Android 预览版，iOS 共用工程已搭建；各平台针对屏幕和输入方式优化，并沿用一致的财务口径。",
+    "SalaryFlow 0.9.5 is an evolving, local-first product for budgeting, cash flow, savings goals, and assets. Windows and an Android preview are available, and the shared iOS project is ready for macOS/Xcode packaging. All platforms follow consistent financial rules.",
   ],
 ];
 

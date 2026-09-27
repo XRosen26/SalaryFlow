@@ -251,6 +251,23 @@ try {
         left >= panelLeft - 1 && right <= panelRight + 1
       ), "大额存钱目标超出卡片边界");
       await page.setViewportSize({ width: 1280, height: 800 });
+      const cardLayout = await planCard.evaluate((card) => {
+        const cardRect = card.getBoundingClientRect();
+        const amountRows = [...card.querySelectorAll(".savings-figures > div")].map(
+          (row) => row.getBoundingClientRect(),
+        );
+        const style = getComputedStyle(card);
+        return {
+          width: cardRect.width,
+          paddingLeft: parseFloat(style.paddingLeft),
+          rowHeights: amountRows.map((row) => row.height),
+        };
+      });
+      assert(cardLayout.width <= 600, "存钱计划卡片被拉得过宽");
+      assert(cardLayout.paddingLeft >= 18, "存钱计划卡片缺少内边距");
+      assert(cardLayout.rowHeights.every((height) => height >= 30), "金额与标签挤在一起");
+      if (!process.env.SALARYFLOW_SKIP_SCREENSHOTS)
+        await page.screenshot({ path: path.join(result, "06-savings-large.png") });
     }
     if (name === "帮助与使用手册") {
       await page

@@ -40,7 +40,7 @@ type BackupBase = {
   formatVersion: 1;
   schemaVersion: 4 | 5;
   createdAt: string;
-  source: { platform: "mobile"; appVersion: "0.6.4" };
+  source: { platform: "mobile"; appVersion: "0.6.5" };
   tables: Record<TableName, BackupRow[]>;
 };
 
@@ -69,7 +69,7 @@ export async function buildBackup(db: SQLiteDatabase): Promise<BackupDocument> {
     formatVersion: 1,
     schemaVersion: 5,
     createdAt: new Date().toISOString(),
-    source: { platform: "mobile", appVersion: "0.6.4" },
+    source: { platform: "mobile", appVersion: "0.6.5" },
     tables,
   };
   return {

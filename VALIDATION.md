@@ -1,4 +1,12 @@
-# 验证记录 · Windows 0.9.4 / Android 0.6.4
+# 验证记录 · Windows 0.9.5 / Android 0.6.5
+
+## Windows 0.9.5 / Android 0.6.5 验收 · 2026-09-27
+
+Windows：66项Node测试、TypeScript/Vite生产构建、源码Electron完整桌面流程及最终解包程序桌面流程均通过。新增回归断言检查存钱计划卡片在200万元目标下的宽度、内边距、三行金额高度和边界；隔离测试账本截图复核文字与卡片留白。最终安装版及便携版Authenticode均为NotSigned。
+
+Android：TypeScript检查和12项领域/数据库测试通过；ARM64 Release完成576项Gradle任务，包括Lint Vital、资源优化、Dex与打包。APK确认versionName 0.6.5、versionCode 12、minSdk 24、target/compileSdk 36，仅含arm64-v8a；APK V2签名验证通过。权限仍只有震动与应用内部接收器。iOS同源bundle导出成功（1390模块），未执行Xcode原生编译或真机测试。
+
+发布安全：Windows ASAR和Android APK的包内清单均未发现SQLite账本、备份或用户路径；Android APK共1235个条目。SHA-256：Windows安装版 `184AADD1C736D6EF59E2C21F75F2F9EE98C655438F1C5879AAC4E93EA34AF3C7`；Windows便携版 `1240394C57734A9C5125BAEF18994CF8A3005373A96482D24B025F9AAA03C415`；Android APK `CECC46F8DF41E2718A560A524CA793027D9A29B6F00F9588CB5D142F04B91FE7`。本轮未连接真实Android设备；Android包为开发预览签名，不作为正式应用市场发布包。
 
 ## Windows 0.9.4 / Android 0.6.4 验收 · 2026-09-27
 

@@ -4,7 +4,7 @@
 
 ## 当前版本
 
-- **0.6.4 预览版**
+- **0.6.5 预览版**
 - Android 7（API 24）及以上，target/compileSdk 36；ARM64 APK 位于 `release/`
 - iOS Bundle ID 为 `com.xrosen26.salaryflow`；Expo iOS bundle 已验证，原生 IPA 需 macOS/Xcode
 - Expo SDK 57、React Native 0.86、TypeScript、Expo Router、Expo SQLite

@@ -521,13 +521,14 @@ const styles = StyleSheet.create({
   },
   figure: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "baseline",
     justifyContent: "space-between",
     gap: spacing.md,
     minWidth: 0,
+    paddingVertical: 3,
   },
-  figureAmount: { flexShrink: 1, textAlign: "right" },
-  caption: { fontSize: 11, marginBottom: 4 },
+  figureAmount: { flexShrink: 1, textAlign: "right", lineHeight: 25 },
+  caption: { fontSize: 13, fontWeight: "600" },
   encourage: { fontSize: 13, fontWeight: "800" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   secondary: {

@@ -3496,7 +3496,7 @@ export default function App() {
             <>
               <section className="panel section-heading">
                 <div>
-                  <h2>{msg("存钱计划")}</h2>
+                  <h2>{msg("我的计划")}</h2>
                   <p>
                     {msg(
                       "关联储蓄或理财账户时自动读取余额；也可以手动维护进度。",
@@ -4316,7 +4316,7 @@ export default function App() {
                       </button>
                       <p>
                         {msg(
-                          "SalaryFlow 0.9.4 · Windows 与移动端本地个人预算、现金流、储蓄目标和资产管理",
+                          "SalaryFlow 0.9.5 · Windows 与移动端本地个人预算、现金流、储蓄目标和资产管理",
                         )}
                       </p>
                       <p>

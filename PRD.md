@@ -22,7 +22,7 @@
 
 数据目录支持验证后复制并重启切换，原数据保留，已有目标账本不覆盖。清理仅渲染缓存，不清账本、审计或备份。帮助与双语说明随应用交付。
 
-版本：V1 已确认基线｜日期：2026-09-06｜当前应用：Windows 0.9.4 / Android 0.6.4。当前实现及差异见 [IMPLEMENTATION.md](./IMPLEMENTATION.md)，使用见 [README.md](./README.md)。
+版本：V1 已确认基线｜日期：2026-09-06｜当前应用：Windows 0.9.5 / Android 0.6.5。当前实现及差异见 [IMPLEMENTATION.md](./IMPLEMENTATION.md)，使用见 [README.md](./README.md)。
 
 总入口：[产品与技术设计方案 V1](./产品与技术设计方案 V1.md)。本文负责需求、范围、业务口径与待确认决策；交互见 [PRODUCT_DESIGN.md](./PRODUCT_DESIGN.md)，数据库与测试见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
 

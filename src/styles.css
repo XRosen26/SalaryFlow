@@ -3680,14 +3680,49 @@ th {
 :root[data-palette="indigo"] .chart-stroke-8 { fill: var(--chart-8); }
 
 /* Let large balances use the available width without covering neighbors. */
-.savings-plan-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
-.savings-plan-card, .savings-plan-head > div { min-width: 0; }
+/* Savings plans need their own spacing; .panel itself has no padding. */
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+.section-heading > div { min-width: 0; }
+.section-heading h2 { margin: 0 0 6px; font-size: 20px; }
+.section-heading p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.section-heading > button { flex-shrink: 0; }
+.savings-plan-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+.savings-plan-card { min-width: 0; padding: 22px 24px; gap: 15px; }
+.savings-plan-head { align-items: flex-start; }
+.savings-plan-head > div { min-width: 0; }
+.savings-plan-head h3 { font-size: 18px; line-height: 1.4; }
+.savings-plan-head small { display: block; font-size: 12px; line-height: 1.5; }
 .savings-plan-head h3, .savings-plan-head small, .savings-plan-card > p { overflow-wrap: anywhere; }
-.savings-plan-head > strong { color: var(--accent); flex-shrink: 0; }
+.savings-plan-head > strong { color: var(--accent); flex-shrink: 0; font-size: 20px; }
+.savings-progress { background: var(--soft); }
 .savings-progress > span { background: var(--accent); }
-.savings-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
-.savings-figures > div { min-width: 0; }
-.savings-figures b { overflow-wrap: anywhere; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.savings-figures { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.savings-figures > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.savings-figures > div:last-child { border-bottom: 0; }
+.savings-figures small { flex-shrink: 0; font-size: 13px; }
+.savings-figures b { min-width: 0; overflow-wrap: anywhere; text-align: right; line-height: 1.35; font-size: 17px; font-variant-numeric: tabular-nums; }
+.savings-plan-card > p { margin: 0; font-size: 13px; line-height: 1.5; }
+.savings-plan-card > .row-actions { margin-top: auto; padding-top: 4px; flex-wrap: wrap; }
+@media (max-width: 580px) {
+  .section-heading { align-items: flex-start; flex-wrap: wrap; }
+  .savings-plan-card { padding: 18px; }
+}
 .summary-card, .stat-strip > div, .account-card, .asset-total { min-width: 0; }
 .summary-card h2, .medium-number, .stat-strip strong, .asset-total strong, .account-balance {
   overflow-wrap: anywhere;
